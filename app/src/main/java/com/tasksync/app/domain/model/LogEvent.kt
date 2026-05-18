@@ -1,0 +1,14 @@
+package com.tasksync.app.domain.model
+
+enum class LogEvent {
+    PROJECT_CREATED,
+    OWNER_TRANSFERRED,
+    MEMBER_PROMOTED,
+    MEMBER_DEMOTED,
+    TASK_CREATED,
+    TASK_ASSIGNED,
+    TASK_STATUS_CHANGED,
+    MEMBER_JOINED,
+    MEMBER_LEFT,
+    PROJECT_DELETED
+}
