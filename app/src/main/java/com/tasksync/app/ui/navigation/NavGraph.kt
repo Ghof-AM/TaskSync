@@ -11,6 +11,8 @@ import com.tasksync.app.ui.auth.AuthViewModel
 import com.tasksync.app.ui.auth.LoginScreen
 import com.tasksync.app.ui.auth.RegisterScreen
 import com.tasksync.app.ui.project.ProjectListScreen
+import com.tasksync.app.ui.task.CreateTaskScreen
+import com.tasksync.app.ui.task.TaskListScreen
 
 @Composable
 fun NavGraph(
@@ -69,7 +71,41 @@ fun NavGraph(
             )
         ) { backStackEntry ->
             val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
-            TaskListPlaceholder(projectId = projectId)
+            TaskListScreen(
+                projectId = projectId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDetail = { taskId ->
+                    navController.navigate(Screen.TaskDetail.createRoute(taskId))
+                },
+                onNavigateToCreate = {
+                    navController.navigate(Screen.CreateTask.createRoute(projectId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.CreateTask.route,
+            arguments = listOf(
+                navArgument("projectId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
+            CreateTaskScreen(
+                projectId = projectId,
+                onNavigateBack = { navController.popBackStack() },
+                onTaskCreated = { navController.popBackStack() }
+            )
+        }
+
+        // Placeholder untuk TaskDetail
+        composable(
+            route = Screen.TaskDetail.route,
+            arguments = listOf(
+                navArgument("taskId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+            TaskListPlaceholder(projectId = taskId)
         }
     }
 }
