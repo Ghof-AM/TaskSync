@@ -1,9 +1,11 @@
 package com.tasksync.app.data.remote
 
+
 import com.google.firebase.firestore.FirebaseFirestore
 import com.tasksync.app.data.mapper.toFirestoreMap
 import com.tasksync.app.domain.model.ActivityLog
 import com.tasksync.app.domain.model.Comment
+import com.tasksync.app.domain.model.Project
 import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.User
 import com.tasksync.app.util.Constants
@@ -84,5 +86,21 @@ class FirestoreService @Inject constructor(
             .document(log.id)
             .set(log.toFirestoreMap())
             .await()
+    }
+    // Projects
+    suspend fun uploadProject(project: Project) {
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(project.id)
+            .set(project.toFirestoreMap())
+            .await()
+    }
+
+    suspend fun getProjectsByUser(userId: String): List<Map<String, Any?>> {
+        return firestore.collection(Constants.COLLECTION_TEAMS)
+            .whereArrayContains("memberIds", userId)
+            .get()
+            .await()
+            .documents
+            .map { it.data ?: emptyMap() }
     }
 }

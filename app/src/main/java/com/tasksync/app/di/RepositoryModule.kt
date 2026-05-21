@@ -3,11 +3,13 @@ package com.tasksync.app.di
 import com.tasksync.app.data.repository.ActivityLogRepositoryImpl
 import com.tasksync.app.data.repository.CommentRepositoryImpl
 import com.tasksync.app.data.repository.ProjectMemberRepositoryImpl
+import com.tasksync.app.data.repository.ProjectRepositoryImpl
 import com.tasksync.app.data.repository.TaskRepositoryImpl
 import com.tasksync.app.data.repository.UserRepositoryImpl
 import com.tasksync.app.domain.repository.ActivityLogRepository
 import com.tasksync.app.domain.repository.CommentRepository
 import com.tasksync.app.domain.repository.ProjectMemberRepository
+import com.tasksync.app.domain.repository.ProjectRepository
 import com.tasksync.app.domain.repository.TaskRepository
 import com.tasksync.app.domain.repository.UserRepository
 import dagger.Binds
@@ -49,4 +51,10 @@ abstract class RepositoryModule {
     abstract fun bindActivityLogRepository(
         impl: ActivityLogRepositoryImpl
     ): ActivityLogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProjectRepository(
+        impl: ProjectRepositoryImpl
+    ): ProjectRepository
 }

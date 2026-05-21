@@ -1,13 +1,16 @@
 package com.tasksync.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.tasksync.app.ui.auth.AuthViewModel
 import com.tasksync.app.ui.auth.LoginScreen
 import com.tasksync.app.ui.auth.RegisterScreen
+import com.tasksync.app.ui.project.ProjectListScreen
 
 @Composable
 fun NavGraph(
@@ -18,7 +21,6 @@ fun NavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
-        // Auth
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -45,10 +47,14 @@ fun NavGraph(
             )
         }
 
-        // Project List (placeholder, akan diisi nanti)
         composable(Screen.ProjectList.route) {
-            ProjectListPlaceholder(
-                onNavigateToLogin = {
+            val authViewModel: AuthViewModel = hiltViewModel()
+            ProjectListScreen(
+                onNavigateToTaskList = { projectId ->
+                    navController.navigate(Screen.TaskList.createRoute(projectId))
+                },
+                onLogout = {
+                    authViewModel.logout()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -56,10 +62,11 @@ fun NavGraph(
             )
         }
 
-        // Task List
         composable(
             route = Screen.TaskList.route,
-            arguments = listOf(navArgument("projectId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("projectId") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
             val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
             TaskListPlaceholder(projectId = projectId)

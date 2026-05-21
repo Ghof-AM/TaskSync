@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.tasksync.app.data.local.AppDatabase
 import com.tasksync.app.data.local.dao.ActivityLogDao
 import com.tasksync.app.data.local.dao.CommentDao
+import com.tasksync.app.data.local.dao.ProjectDao
 import com.tasksync.app.data.local.dao.ProjectMemberDao
 import com.tasksync.app.data.local.dao.TaskDao
 import com.tasksync.app.data.local.dao.UserDao
@@ -49,4 +50,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideActivityLogDao(db: AppDatabase): ActivityLogDao = db.activityLogDao()
+
+    @Provides
+    @Singleton
+    fun provideProjectDao(db: AppDatabase): ProjectDao = db.projectDao()
 }
