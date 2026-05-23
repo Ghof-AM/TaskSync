@@ -22,18 +22,30 @@ class UserRepositoryImpl @Inject constructor(
 ) : UserRepository {
 
     override suspend fun getCurrentUser(): User? {
-        val uid = firebaseAuth.currentUser?.uid ?: return null
+        val firebaseUser = firebaseAuth.currentUser ?: return null
+        val uid = firebaseUser.uid
+
+        // Cek lokal dulu
         val local = userDao.getUserById(uid)
         if (local != null) return local.toDomain()
+
+        // Buat user dari Firebase Auth jika belum ada di Room
+        val user = User(
+            id = uid,
+            name = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "User",
+            email = firebaseUser.email ?: "",
+            photoUrl = firebaseUser.photoUrl?.toString() ?: ""
+        )
+        // Simpan ke Room
+        userDao.insertUser(user.toEntity())
+
+        // Coba sync ke Firestore
         if (networkMonitor.isOnline()) {
-            val remote = firestoreService.getUserById(uid)
-            if (remote != null) {
-                val user = remote.toUser()
-                userDao.insertUser(user.toEntity())
-                return user
-            }
+            try {
+                firestoreService.uploadUser(user)
+            } catch (e: Exception) { /* skip */ }
         }
-        return null
+        return user
     }
 
     override suspend fun getUserById(userId: String): User? {

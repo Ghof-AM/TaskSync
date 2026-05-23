@@ -12,6 +12,7 @@ class AddCommentUseCase @Inject constructor(
         require(content.isNotBlank()) { "Komentar tidak boleh kosong" }
         require(content.length <= 500) { "Komentar maksimal 500 karakter" }
         val comment = Comment(
+            id = java.util.UUID.randomUUID().toString(), // pastikan fresh UUID
             taskId = taskId,
             userId = user.id,
             userName = user.name,

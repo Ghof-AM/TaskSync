@@ -43,9 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.tasksync.app.domain.model.Priority
 import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.TaskStatus
+import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.util.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -78,6 +77,9 @@ fun TaskListScreen(
     val userRole by viewModel.userRole.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Tentukan apakah user adalah admin berdasarkan StateFlow
+    val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
 
     LaunchedEffect(projectId) {
         viewModel.loadTasks(projectId)
@@ -120,7 +122,8 @@ fun TaskListScreen(
             )
         },
         floatingActionButton = {
-            if (viewModel.isAdminOrOwner()) {
+            // Gunakan isAdmin dari StateFlow, bukan fungsi biasa
+            if (isAdmin) {
                 FloatingActionButton(
                     onClick = onNavigateToCreate,
                     containerColor = MaterialTheme.colorScheme.primary
@@ -171,6 +174,7 @@ fun TaskListScreen(
                         CircularProgressIndicator()
                     }
                 }
+
                 is UiState.Success -> {
                     val filtered = if (selectedFilter == null) {
                         state.data
@@ -193,7 +197,8 @@ fun TaskListScreen(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (viewModel.isAdminOrOwner()) {
+                                // Gunakan isAdmin dari StateFlow
+                                if (isAdmin) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Tap + untuk membuat task baru",
@@ -214,7 +219,8 @@ fun TaskListScreen(
                             ) { task ->
                                 TaskCard(
                                     task = task,
-                                    isAdmin = viewModel.isAdminOrOwner(),
+                                    // Gunakan isAdmin dari StateFlow
+                                    isAdmin = isAdmin,
                                     onClick = { onNavigateToDetail(task.id) },
                                     onStatusToggle = {
                                         val newStatus = when (task.status) {
@@ -232,6 +238,7 @@ fun TaskListScreen(
                         }
                     }
                 }
+
                 is UiState.Error -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -243,6 +250,7 @@ fun TaskListScreen(
                         )
                     }
                 }
+
                 else -> {}
             }
         }

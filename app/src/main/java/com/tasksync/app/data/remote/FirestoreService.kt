@@ -103,4 +103,13 @@ class FirestoreService @Inject constructor(
             .documents
             .map { it.data ?: emptyMap() }
     }
+    suspend fun getCommentsByTask(taskId: String): List<Map<String, Any?>> {
+        return firestore.collection(Constants.COLLECTION_COMMENTS)
+            .whereEqualTo("taskId", taskId)
+            // hapus .orderBy("createdAt") sementara
+            .get()
+            .await()
+            .documents
+            .map { it.data ?: emptyMap() }
+    }
 }

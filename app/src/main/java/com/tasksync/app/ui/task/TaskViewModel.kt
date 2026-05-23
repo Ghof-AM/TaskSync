@@ -63,7 +63,9 @@ class TaskViewModel @Inject constructor(
     fun loadUserRole(projectId: String) {
         viewModelScope.launch {
             val uid = firebaseAuth.currentUser?.uid ?: return@launch
-            _userRole.value = memberRepository.getRole(projectId, uid)
+            val role = memberRepository.getRole(projectId, uid)
+            android.util.Log.d("TaskViewModel", "User: $uid, Project: $projectId, Role: $role")
+            _userRole.value = role
         }
     }
 

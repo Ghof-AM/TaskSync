@@ -16,7 +16,7 @@ interface CommentDao {
     @Query("SELECT * FROM comments WHERE isSynced = 0")
     suspend fun getUnsyncedComments(): List<CommentEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)  // ganti REPLACE → IGNORE
     suspend fun insertComment(comment: CommentEntity)
 
     @Query("UPDATE comments SET isSynced = 1 WHERE id = :commentId")
@@ -27,4 +27,7 @@ interface CommentDao {
 
     @Query("DELETE FROM comments WHERE taskId = :taskId")
     suspend fun deleteAllByTask(taskId: String)
+
+    @Query("SELECT * FROM comments WHERE id = :commentId LIMIT 1")
+    suspend fun getCommentById(commentId: String): CommentEntity?
 }

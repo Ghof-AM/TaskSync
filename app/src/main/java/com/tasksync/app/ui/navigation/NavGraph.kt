@@ -13,6 +13,7 @@ import com.tasksync.app.ui.auth.RegisterScreen
 import com.tasksync.app.ui.project.ProjectListScreen
 import com.tasksync.app.ui.task.CreateTaskScreen
 import com.tasksync.app.ui.task.TaskListScreen
+import com.tasksync.app.ui.task.TaskDetailScreen
 
 @Composable
 fun NavGraph(
@@ -105,7 +106,10 @@ fun NavGraph(
             )
         ) { backStackEntry ->
             val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
-            TaskListPlaceholder(projectId = taskId)
+            TaskDetailScreen(
+                taskId = taskId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

@@ -8,4 +8,5 @@ interface CommentRepository {
     suspend fun addComment(comment: Comment)
     suspend fun deleteComment(commentId: String)
     suspend fun syncAllPending()
+    suspend fun pullFromFirestore(taskId: String)
 }

@@ -21,8 +21,11 @@ class CommentRepositoryImpl @Inject constructor(
         commentDao.getCommentsByTask(taskId).map { list -> list.map { it.toDomain() } }
 
     override suspend fun addComment(comment: Comment) {
+        // 1. Simpan lokal dulu
         val entity = comment.toEntity().copy(isSynced = false)
         commentDao.insertComment(entity)
+
+        // 2. Langsung sync ke Firestore jika online
         if (networkMonitor.isOnline()) {
             try {
                 firestoreService.uploadComment(comment)
@@ -46,6 +49,31 @@ class CommentRepositoryImpl @Inject constructor(
                 firestoreService.uploadComment(entity.toDomain())
                 commentDao.markAsSynced(entity.id)
             } catch (e: Exception) { /* skip */ }
+        }
+    }
+    override suspend fun pullFromFirestore(taskId: String) {
+        if (!networkMonitor.isOnline()) return
+        try {
+            val remoteComments = firestoreService.getCommentsByTask(taskId)
+            remoteComments.forEach { data ->
+                val id = data["id"] as? String ?: return@forEach
+                // Cek apakah sudah ada di Room — kalau sudah ada, skip
+                val existing = commentDao.getCommentById(id)
+                if (existing == null) {
+                    val comment = Comment(
+                        id = id,
+                        taskId = data["taskId"] as? String ?: "",
+                        userId = data["userId"] as? String ?: "",
+                        userName = data["userName"] as? String ?: "",
+                        content = data["content"] as? String ?: "",
+                        isSynced = true,
+                        createdAt = (data["createdAt"] as? Long) ?: 0L
+                    )
+                    commentDao.insertComment(comment.toEntity().copy(isSynced = true))
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CommentRepo", "Pull error: ${e.message}")
         }
     }
 }

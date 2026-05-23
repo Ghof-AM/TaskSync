@@ -27,16 +27,28 @@ class ProjectRepositoryImpl @Inject constructor(
         projectDao.getProjectById(projectId)?.toDomain()
 
     override suspend fun createProject(project: Project, creatorId: String) {
-        // Simpan project lokal
+        // 1. Simpan project lokal
         projectDao.insertProject(project.toEntity())
-        // Tambah creator sebagai Owner
-        memberRepository.addMember(project.id, creatorId, UserRole.OWNER)
-        // Sync ke Firestore jika online
+
+        // 2. Tambah creator sebagai Owner — pastikan ini berhasil
+        memberRepository.addMember(
+            projectId = project.id,
+            userId = creatorId,
+            role = UserRole.OWNER
+        )
+
+        // 3. Verifikasi role tersimpan
+        val savedRole = memberRepository.getRole(project.id, creatorId)
+        android.util.Log.d("ProjectRepo", "Creator role saved: $savedRole for project: ${project.id}")
+
+        // 4. Sync ke Firestore jika online
         if (networkMonitor.isOnline()) {
             try {
                 firestoreService.uploadProject(project)
                 projectDao.markAsSynced(project.id)
-            } catch (e: Exception) { /* WorkManager retry */ }
+            } catch (e: Exception) {
+                android.util.Log.e("ProjectRepo", "Sync failed: ${e.message}")
+            }
         }
     }
 
