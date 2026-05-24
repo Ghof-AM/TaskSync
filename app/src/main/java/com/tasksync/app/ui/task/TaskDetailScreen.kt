@@ -72,6 +72,7 @@ fun TaskDetailScreen(
     val addCommentState by commentViewModel.addCommentState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var commentText by remember { mutableStateOf("") }
+    val currentUser by commentViewModel.currentUser.collectAsState()
 
     val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
 
@@ -221,6 +222,7 @@ fun TaskDetailScreen(
                     }
 
                     // Comment input
+                    // Comment input — disable jika user belum loaded
                     HorizontalDivider()
                     CommentInputBar(
                         value = commentText,
@@ -230,7 +232,8 @@ fun TaskDetailScreen(
                                 commentViewModel.addComment(taskId, commentText)
                             }
                         },
-                        isSending = addCommentState is UiState.Loading
+                        isSending = addCommentState is UiState.Loading,
+                        isEnabled = currentUser != null  // tambahkan parameter ini
                     )
                 }
             }
@@ -445,7 +448,8 @@ fun CommentInputBar(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
-    isSending: Boolean
+    isSending: Boolean,
+    isEnabled: Boolean = true  // tambahkan
 ) {
     Row(
         modifier = Modifier
@@ -456,7 +460,13 @@ fun CommentInputBar(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("Tulis komentar...") },
+            placeholder = {
+                Text(
+                    if (isEnabled) "Tulis komentar..."
+                    else "Memuat profil..."
+                )
+            },
+            enabled = isEnabled,
             maxLines = 3,
             modifier = Modifier.weight(1f),
             shape = MaterialTheme.shapes.large
@@ -464,7 +474,7 @@ fun CommentInputBar(
         Spacer(modifier = Modifier.width(8.dp))
         IconButton(
             onClick = onSend,
-            enabled = value.isNotBlank() && !isSending
+            enabled = value.isNotBlank() && !isSending && isEnabled
         ) {
             if (isSending) {
                 CircularProgressIndicator(
@@ -475,7 +485,7 @@ fun CommentInputBar(
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Kirim komentar",
-                    tint = if (value.isNotBlank())
+                    tint = if (value.isNotBlank() && isEnabled)
                         MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )

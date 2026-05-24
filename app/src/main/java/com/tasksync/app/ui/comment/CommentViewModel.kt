@@ -74,7 +74,13 @@ class CommentViewModel @Inject constructor(
 
     fun loadCurrentUser() {
         viewModelScope.launch {
-            _currentUser.value = userRepository.getCurrentUser()
+            try {
+                val user = userRepository.getCurrentUser()
+                _currentUser.value = user
+                android.util.Log.d("CommentVM", "Current user loaded: ${user?.name}")
+            } catch (e: Exception) {
+                android.util.Log.e("CommentVM", "Load user failed: ${e.message}")
+            }
         }
     }
 

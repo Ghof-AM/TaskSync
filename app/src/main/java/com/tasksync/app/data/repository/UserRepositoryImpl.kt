@@ -27,24 +27,45 @@ class UserRepositoryImpl @Inject constructor(
 
         // Cek lokal dulu
         val local = userDao.getUserById(uid)
-        if (local != null) return local.toDomain()
+        if (local != null && local.name.isNotBlank()) return local.toDomain()
 
-        // Buat user dari Firebase Auth jika belum ada di Room
+        // Ambil dari Firestore
+        if (networkMonitor.isOnline()) {
+            try {
+                val remote = firestoreService.getUserById(uid)
+                if (remote != null) {
+                    val user = remote.toUser()
+                    if (user.name.isNotBlank()) {
+                        userDao.insertUser(user.toEntity())
+                        return user
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("UserRepo", "Firestore fetch failed: ${e.message}")
+            }
+        }
+
+        // Fallback dari Firebase Auth
+        val name = firebaseUser.displayName?.takeIf { it.isNotBlank() }
+            ?: firebaseUser.email?.substringBefore("@")
+            ?: "User"
+
         val user = User(
             id = uid,
-            name = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "User",
-            email = firebaseUser.email ?: "",
-            photoUrl = firebaseUser.photoUrl?.toString() ?: ""
+            name = name,
+            email = firebaseUser.email ?: ""
         )
-        // Simpan ke Room
+
+        // Simpan ke Room agar tidak perlu fetch ulang
         userDao.insertUser(user.toEntity())
 
-        // Coba sync ke Firestore
+        // Sync ke Firestore
         if (networkMonitor.isOnline()) {
             try {
                 firestoreService.uploadUser(user)
             } catch (e: Exception) { /* skip */ }
         }
+
         return user
     }
 

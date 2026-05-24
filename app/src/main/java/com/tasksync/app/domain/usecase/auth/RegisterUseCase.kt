@@ -14,10 +14,23 @@ class RegisterUseCase @Inject constructor(
         require(name.isNotBlank()) { "Nama tidak boleh kosong" }
         require(email.isNotBlank()) { "Email tidak boleh kosong" }
         require(password.length >= 6) { "Password minimal 6 karakter" }
+
         val result = firebaseAuth
             .createUserWithEmailAndPassword(email, password).await()
         val uid = result.user?.uid ?: error("Registrasi gagal")
-        val user = User(id = uid, name = name, email = email)
+
+        // Update display name di Firebase Auth
+        val profileUpdate = com.google.firebase.auth.userProfileChangeRequest {
+            displayName = name
+        }
+        result.user?.updateProfile(profileUpdate)?.await()
+
+        // Simpan ke Room & Firestore
+        val user = User(
+            id = uid,
+            name = name,
+            email = email
+        )
         userRepository.saveUser(user)
     }
 }
