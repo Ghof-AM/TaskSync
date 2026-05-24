@@ -65,6 +65,16 @@ class FirestoreService @Inject constructor(
             .await()
     }
 
+    suspend fun getUserByEmail(email: String): Map<String, Any?>? {
+        return firestore.collection(Constants.COLLECTION_USERS)
+            .whereEqualTo("email", email)
+            .limit(1)
+            .get()
+            .await()
+            .documents
+            .firstOrNull()
+            ?.data
+    }
     suspend fun getUserById(userId: String): Map<String, Any?>? {
         return firestore.collection(Constants.COLLECTION_USERS)
             .document(userId)

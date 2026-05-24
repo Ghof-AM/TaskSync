@@ -28,6 +28,9 @@ interface ProjectMemberDao {
     @Query("UPDATE project_members SET role = :newRole, isSynced = 0 WHERE projectId = :projectId AND userId = :userId")
     suspend fun updateRole(projectId: String, userId: String, newRole: String)
 
+    @Query("UPDATE project_members SET userName = :name, userEmail = :email WHERE projectId = :projectId AND userId = :userId")
+    suspend fun updateMemberName(projectId: String, userId: String, name: String, email: String)
+
     @Query("DELETE FROM project_members WHERE projectId = :projectId AND userId = :userId")
     suspend fun removeMember(projectId: String, userId: String)
 

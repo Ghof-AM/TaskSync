@@ -14,6 +14,8 @@ import com.tasksync.app.ui.project.ProjectListScreen
 import com.tasksync.app.ui.task.CreateTaskScreen
 import com.tasksync.app.ui.task.TaskListScreen
 import com.tasksync.app.ui.task.TaskDetailScreen
+import com.tasksync.app.ui.profile.ProfileScreen
+import com.tasksync.app.ui.team.TeamScreen
 
 @Composable
 fun NavGraph(
@@ -80,6 +82,12 @@ fun NavGraph(
                 },
                 onNavigateToCreate = {
                     navController.navigate(Screen.CreateTask.createRoute(projectId))
+                },
+                onNavigateToTeam = {
+                    navController.navigate(Screen.Team.createRoute(projectId))
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.Profile.route)
                 }
             )
         }
@@ -95,6 +103,32 @@ fun NavGraph(
                 projectId = projectId,
                 onNavigateBack = { navController.popBackStack() },
                 onTaskCreated = { navController.popBackStack() }
+            )
+        }
+
+        // Profile
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Team
+        composable(
+            route = Screen.Team.route,
+            arguments = listOf(
+                navArgument("projectId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
+            TeamScreen(
+                projectId = projectId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

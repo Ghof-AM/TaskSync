@@ -48,6 +48,23 @@ class UserRepositoryImpl @Inject constructor(
         return user
     }
 
+    override suspend fun getUserByEmail(email: String): User? {
+        // Cari di Firestore berdasarkan email
+        if (networkMonitor.isOnline()) {
+            try {
+                val result = firestoreService.getUserByEmail(email)
+                if (result != null) {
+                    val user = result.toUser()
+                    userDao.insertUser(user.toEntity())
+                    return user
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("UserRepo", "getUserByEmail error: ${e.message}")
+            }
+        }
+        return null
+    }
+
     override suspend fun getUserById(userId: String): User? {
         val local = userDao.getUserById(userId)
         if (local != null) return local.toDomain()

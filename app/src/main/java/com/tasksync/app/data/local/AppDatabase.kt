@@ -26,7 +26,7 @@ import com.tasksync.app.data.local.entity.UserEntity
         ActivityLogEntity::class,
         ProjectEntity::class
     ],
-    version = 2,
+    version = 3,  // naik dari 2 ke 3
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

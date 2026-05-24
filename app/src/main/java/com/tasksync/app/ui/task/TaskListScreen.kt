@@ -61,6 +61,8 @@ import com.tasksync.app.util.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Group
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +72,8 @@ fun TaskListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDetail: (taskId: String) -> Unit,
     onNavigateToCreate: () -> Unit,
+    onNavigateToTeam: () -> Unit,   // tambahkan
+    onNavigateToProfile: () -> Unit, // tambahkan
     viewModel: TaskViewModel = hiltViewModel()
 ) {
     val tasksState by viewModel.tasksState.collectAsState()
@@ -111,6 +115,22 @@ fun TaskListScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Kembali"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onNavigateToTeam) {
+                        Icon(
+                            Icons.Default.Group,
+                            contentDescription = "Tim",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    IconButton(onClick = onNavigateToProfile) {
+                        Icon(
+                            Icons.Default.AccountCircle,
+                            contentDescription = "Profil",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 },
