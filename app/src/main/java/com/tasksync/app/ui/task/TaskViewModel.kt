@@ -9,6 +9,7 @@ import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.TaskStatus
 import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.domain.repository.ProjectMemberRepository
+import com.tasksync.app.domain.repository.TaskRepository
 import com.tasksync.app.domain.usecase.task.CreateTaskUseCase
 import com.tasksync.app.domain.usecase.task.DeleteTaskUseCase
 import com.tasksync.app.domain.usecase.task.GetAllTasksUseCase
@@ -32,6 +33,7 @@ class TaskViewModel @Inject constructor(
     private val updateTaskStatusUseCase: UpdateTaskStatusUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val memberRepository: ProjectMemberRepository,
+    private val taskRepository: TaskRepository,  // tambahkan ini
     private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
@@ -53,6 +55,61 @@ class TaskViewModel @Inject constructor(
 
     val currentUserId: String
         get() = firebaseAuth.currentUser?.uid ?: ""
+
+    private val _taskDetail = MutableStateFlow<Task?>(null)
+    val taskDetail: StateFlow<Task?> = _taskDetail.asStateFlow()
+
+    private val _editState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
+    val editState: StateFlow<UiState<Unit>> = _editState.asStateFlow()
+
+    fun loadTaskForEdit(taskId: String) {
+        viewModelScope.launch {
+            try {
+                val task = taskRepository.getTaskById(taskId)
+                _taskDetail.value = task
+            } catch (e: Exception) {
+                android.util.Log.e("TaskViewModel", "Load task failed: ${e.message}")
+            }
+        }
+    }
+
+    fun editTask(
+        taskId: String,
+        projectId: String,
+        title: String,
+        description: String,
+        assignedTo: String,
+        assignedToName: String,
+        priority: Priority,
+        deadline: Long
+    ) {
+        viewModelScope.launch {
+            _editState.value = UiState.Loading
+            try {
+                require(title.isNotBlank()) { "Judul task tidak boleh kosong" }
+                val current = taskRepository.getTaskById(taskId)
+                    ?: throw Exception("Task tidak ditemukan")
+                val updated = current.copy(
+                    title = title.trim(),
+                    description = description.trim(),
+                    assignedTo = assignedTo,
+                    assignedToName = assignedToName,
+                    priority = priority,
+                    deadline = deadline,
+                    isSynced = false,
+                    updatedAt = System.currentTimeMillis()
+                )
+                taskRepository.updateTask(updated)
+                _editState.value = UiState.Success(Unit)
+            } catch (e: Exception) {
+                _editState.value = UiState.Error(e.message ?: "Gagal mengubah task")
+            }
+        }
+    }
+
+    fun resetEditState() {
+        _editState.value = UiState.Idle
+    }
 
     fun loadTasks(projectId: String) {
         getAllTasksUseCase(projectId)

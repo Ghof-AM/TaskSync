@@ -22,5 +22,9 @@ sealed class Screen(val route: String) {
     data object ActivityLog : Screen("activity_log/{projectId}") {
         fun createRoute(projectId: String) = "activity_log/$projectId"
     }
+    data object EditTask : Screen("edit_task/{taskId}/{projectId}") {
+        fun createRoute(taskId: String, projectId: String) =
+            "edit_task/$taskId/$projectId"
+    }
     data object ProjectList : Screen("project_list")
 }

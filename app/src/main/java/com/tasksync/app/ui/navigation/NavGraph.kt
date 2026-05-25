@@ -16,6 +16,7 @@ import com.tasksync.app.ui.task.TaskListScreen
 import com.tasksync.app.ui.task.TaskDetailScreen
 import com.tasksync.app.ui.profile.ProfileScreen
 import com.tasksync.app.ui.team.TeamScreen
+import com.tasksync.app.ui.task.EditTaskScreen
 
 @Composable
 fun NavGraph(
@@ -142,7 +143,26 @@ fun NavGraph(
             val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
             TaskDetailScreen(
                 taskId = taskId,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToEdit = { tId, pId ->
+                    navController.navigate(Screen.EditTask.createRoute(tId, pId))
+                }
+            )
+        }
+        composable(
+            route = Screen.EditTask.route,
+            arguments = listOf(
+                navArgument("taskId") { type = NavType.StringType },
+                navArgument("projectId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+            val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
+            EditTaskScreen(
+                taskId = taskId,
+                projectId = projectId,
+                onNavigateBack = { navController.popBackStack() },
+                onTaskUpdated = { navController.popBackStack() }
             )
         }
     }

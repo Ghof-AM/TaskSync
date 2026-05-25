@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +65,7 @@ import java.util.Locale
 fun TaskDetailScreen(
     taskId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToEdit: (taskId: String, projectId: String) -> Unit, // tambahkan
     taskDetailViewModel: TaskDetailViewModel = hiltViewModel(),
     commentViewModel: CommentViewModel = hiltViewModel()
 ) {
@@ -102,6 +104,24 @@ fun TaskDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                actions = {
+                    if (isAdmin) {
+                        IconButton(
+                            onClick = {
+                                val task = (taskState as? UiState.Success)?.data
+                                if (task != null) {
+                                    onNavigateToEdit(taskId, task.projectId)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit Task",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                },
                 title = {
                     Text(
                         "Detail Task",
