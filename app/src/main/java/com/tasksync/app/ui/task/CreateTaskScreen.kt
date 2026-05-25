@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.tasksync.app.domain.model.Priority
+import com.tasksync.app.domain.model.ProjectMember
 import com.tasksync.app.util.UiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,14 +55,25 @@ fun CreateTaskScreen(
     viewModel: TaskViewModel = hiltViewModel()
 ) {
     val createState by viewModel.createState.collectAsState()
+    val projectMembers by viewModel.projectMembers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var assignedTo by remember { mutableStateOf("") }
+
+    // Assignee state
+    var selectedMember by remember { mutableStateOf<ProjectMember?>(null) }
+    var assigneeExpanded by remember { mutableStateOf(false) }
+
+    // Priority state
     var selectedPriority by remember { mutableStateOf(Priority.MEDIUM) }
-    var deadline by remember { mutableLongStateOf(0L) }
     var priorityExpanded by remember { mutableStateOf(false) }
+
+    var deadline by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(projectId) {
+        viewModel.loadProjectMembers(projectId)
+    }
 
     LaunchedEffect(createState) {
         when (createState) {
@@ -129,14 +142,90 @@ fun CreateTaskScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Assign to (UID atau email — simplified)
-            OutlinedTextField(
-                value = assignedTo,
-                onValueChange = { assignedTo = it },
-                label = { Text("Assign ke (User ID)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Assignee dropdown
+            ExposedDropdownMenuBox(
+                expanded = assigneeExpanded,
+                onExpandedChange = { assigneeExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = when {
+                        selectedMember == null -> "Pilih anggota..."
+                        selectedMember!!.userName.isNotBlank() -> selectedMember!!.userName
+                        selectedMember!!.userEmail.isNotBlank() -> selectedMember!!.userEmail
+                        else -> selectedMember!!.userId.take(8) + "..."
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Assign ke") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = assigneeExpanded
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                )
+                ExposedDropdownMenu(
+                    expanded = assigneeExpanded,
+                    onDismissRequest = { assigneeExpanded = false }
+                ) {
+                    // Opsi "Tidak di-assign"
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Tidak di-assign",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        onClick = {
+                            selectedMember = null
+                            assigneeExpanded = false
+                        }
+                    )
+
+                    // Daftar anggota
+                    projectMembers.forEach { member ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = when {
+                                            member.userName.isNotBlank() -> member.userName
+                                            member.userEmail.isNotBlank() -> member.userEmail
+                                            else -> member.userId.take(8) + "..."
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    if (member.userName.isNotBlank() &&
+                                        member.userEmail.isNotBlank()
+                                    ) {
+                                        Text(
+                                            text = member.userEmail,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        text = when (member.role) {
+                                            com.tasksync.app.domain.model.UserRole.OWNER -> "👑 Owner"
+                                            com.tasksync.app.domain.model.UserRole.SECOND_OWNER -> "⭐ 2nd Owner"
+                                            com.tasksync.app.domain.model.UserRole.MEMBER -> "👤 Member"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            onClick = {
+                                selectedMember = member
+                                assigneeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
 
             // Priority dropdown
             ExposedDropdownMenuBox(
@@ -149,7 +238,9 @@ fun CreateTaskScreen(
                     readOnly = true,
                     label = { Text("Prioritas") },
                     trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityExpanded)
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = priorityExpanded
+                        )
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -161,7 +252,12 @@ fun CreateTaskScreen(
                 ) {
                     Priority.entries.forEach { priority ->
                         DropdownMenuItem(
-                            text = { Text(priority.displayName()) },
+                            text = {
+                                Text(
+                                    text = priority.displayName(),
+                                    color = priority.color()
+                                )
+                            },
                             onClick = {
                                 selectedPriority = priority
                                 priorityExpanded = false
@@ -184,7 +280,9 @@ fun CreateTaskScreen(
                             projectId = projectId,
                             title = title,
                             description = description,
-                            assignedTo = assignedTo,
+                            assignedTo = selectedMember?.userId ?: "",
+                            assignedToName = selectedMember?.userName
+                                ?: selectedMember?.userEmail ?: "",
                             priority = selectedPriority,
                             deadline = deadline
                         )
@@ -193,7 +291,10 @@ fun CreateTaskScreen(
                             createState !is UiState.Loading
                 ) {
                     if (createState is UiState.Loading) {
-                        CircularProgressIndicator(strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
                     } else {
                         Text("Buat Task")
                     }

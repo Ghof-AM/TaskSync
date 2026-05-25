@@ -13,6 +13,7 @@ data class TaskEntity(
     val title: String = "",
     val description: String = "",
     val assignedTo: String = "",
+    val assignedToName: String = "",  // ← tambahkan ini
     val createdBy: String = "",
     val status: String = "todo",
     val priority: String = "medium",

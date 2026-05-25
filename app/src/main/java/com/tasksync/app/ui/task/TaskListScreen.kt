@@ -381,6 +381,16 @@ fun TaskCard(
                     )
                 }
 
+                // Setelah description text, tambahkan:
+                if (task.assignedToName.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "👤 ${task.assignedToName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
                 if (task.deadline > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
                     val isOverdue = task.deadline < System.currentTimeMillis()

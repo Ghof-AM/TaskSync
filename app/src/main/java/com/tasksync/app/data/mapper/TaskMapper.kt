@@ -12,6 +12,7 @@ fun TaskEntity.toDomain(): Task = Task(
     title = title,
     description = description,
     assignedTo = assignedTo,
+    assignedToName = assignedToName,  // ← tambahkan
     createdBy = createdBy,
     status = TaskStatus.fromValue(status),
     priority = Priority.fromValue(priority),
@@ -28,6 +29,7 @@ fun Task.toEntity(): TaskEntity = TaskEntity(
     title = title,
     description = description,
     assignedTo = assignedTo,
+    assignedToName = assignedToName,  // ← tambahkan
     createdBy = createdBy,
     status = status.value,
     priority = priority.value,
@@ -44,6 +46,7 @@ fun Task.toFirestoreMap(): Map<String, Any?> = mapOf(
     "title" to title,
     "description" to description,
     "assignedTo" to assignedTo,
+    "assignedToName" to assignedToName,  // ← tambahkan
     "createdBy" to createdBy,
     "status" to status.value,
     "priority" to priority.value,

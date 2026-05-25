@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.tasksync.app.domain.model.Priority
+import com.tasksync.app.domain.model.ProjectMember
 import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.TaskStatus
 import com.tasksync.app.domain.model.UserRole
@@ -46,6 +47,10 @@ class TaskViewModel @Inject constructor(
     private val _selectedFilter = MutableStateFlow<TaskStatus?>(null)
     val selectedFilter: StateFlow<TaskStatus?> = _selectedFilter.asStateFlow()
 
+    // Tambahkan ini
+    private val _projectMembers = MutableStateFlow<List<ProjectMember>>(emptyList())
+    val projectMembers: StateFlow<List<ProjectMember>> = _projectMembers.asStateFlow()
+
     val currentUserId: String
         get() = firebaseAuth.currentUser?.uid ?: ""
 
@@ -69,6 +74,18 @@ class TaskViewModel @Inject constructor(
         }
     }
 
+    // Tambahkan fungsi ini
+    fun loadProjectMembers(projectId: String) {
+        memberRepository.getMembersByProject(projectId)
+            .onEach { members ->
+                _projectMembers.value = members
+            }
+            .catch { e ->
+                android.util.Log.e("TaskViewModel", "Load members failed: ${e.message}")
+            }
+            .launchIn(viewModelScope)
+    }
+
     fun setFilter(status: TaskStatus?) {
         _selectedFilter.value = status
     }
@@ -78,6 +95,7 @@ class TaskViewModel @Inject constructor(
         title: String,
         description: String,
         assignedTo: String,
+        assignedToName: String,
         priority: Priority,
         deadline: Long
     ) {
@@ -86,12 +104,13 @@ class TaskViewModel @Inject constructor(
             _createState.value = UiState.Loading
             try {
                 val task = Task(
-                    id = UUID.randomUUID().toString(),
+                    id = java.util.UUID.randomUUID().toString(),
                     projectId = projectId,
                     teamId = projectId,
                     title = title.trim(),
                     description = description.trim(),
                     assignedTo = assignedTo,
+                    assignedToName = assignedToName,
                     createdBy = uid,
                     priority = priority,
                     deadline = deadline
