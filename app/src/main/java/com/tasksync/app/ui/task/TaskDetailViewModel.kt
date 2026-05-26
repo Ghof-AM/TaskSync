@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.tasksync.app.domain.model.Task
+import com.tasksync.app.domain.model.TaskStatus
 import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.domain.repository.ProjectMemberRepository
 import com.tasksync.app.domain.repository.TaskRepository
+import com.tasksync.app.domain.usecase.task.UpdateTaskStatusUseCase
 import com.tasksync.app.util.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +21,7 @@ import javax.inject.Inject
 class TaskDetailViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val memberRepository: ProjectMemberRepository,
+    private val updateTaskStatusUseCase: UpdateTaskStatusUseCase,
     private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
@@ -34,7 +37,6 @@ class TaskDetailViewModel @Inject constructor(
                 val task = taskRepository.getTaskById(taskId)
                 if (task != null) {
                     _taskState.value = UiState.Success(task)
-                    // Load role setelah task berhasil didapat
                     loadUserRole(task.projectId)
                 } else {
                     _taskState.value = UiState.Error("Task tidak ditemukan")
@@ -54,10 +56,10 @@ class TaskDetailViewModel @Inject constructor(
         }
     }
 
-    fun updateStatus(taskId: String, status: com.tasksync.app.domain.model.TaskStatus) {
+    fun updateStatus(taskId: String, status: TaskStatus) {
         viewModelScope.launch {
             try {
-                taskRepository.updateStatus(taskId, status.value)
+                updateTaskStatusUseCase(taskId, status) // ← pakai use case
                 loadTask(taskId)
             } catch (e: Exception) {
                 _taskState.value = UiState.Error(e.message ?: "Gagal update status")

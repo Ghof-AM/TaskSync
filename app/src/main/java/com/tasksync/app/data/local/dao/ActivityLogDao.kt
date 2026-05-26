@@ -16,7 +16,7 @@ interface ActivityLogDao {
     @Query("SELECT * FROM activity_log WHERE isSynced = 0")
     suspend fun getUnsyncedLogs(): List<ActivityLogEntity>
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)  // ← REPLACE bukan IGNORE
     suspend fun insert(log: ActivityLogEntity)
 
     @Query("UPDATE activity_log SET isSynced = 1 WHERE id = :logId")

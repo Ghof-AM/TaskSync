@@ -63,6 +63,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,8 +73,9 @@ fun TaskListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDetail: (taskId: String) -> Unit,
     onNavigateToCreate: () -> Unit,
-    onNavigateToTeam: () -> Unit,   // tambahkan
-    onNavigateToProfile: () -> Unit, // tambahkan
+    onNavigateToTeam: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToActivityLog: () -> Unit,  // tambahkan
     viewModel: TaskViewModel = hiltViewModel()
 ) {
     val tasksState by viewModel.tasksState.collectAsState()
@@ -119,6 +121,13 @@ fun TaskListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToActivityLog) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = "Riwayat Aktivitas",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                     IconButton(onClick = onNavigateToTeam) {
                         Icon(
                             Icons.Default.Group,

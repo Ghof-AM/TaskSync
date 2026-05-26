@@ -7,7 +7,7 @@ import java.util.UUID
 @Entity(tableName = "activity_log")
 data class ActivityLogEntity(
     @PrimaryKey
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),  // ← pastikan ada default UUID
     val projectId: String = "",
     val actorId: String = "",
     val actorName: String = "",

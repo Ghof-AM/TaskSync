@@ -22,12 +22,17 @@ class ActivityLogRepositoryImpl @Inject constructor(
         logDao.getLogsByProject(projectId).map { list -> list.map { it.toDomain() } }
 
     override suspend fun addLog(log: ActivityLog) {
+        android.util.Log.d("ActivityLogRepo", "Adding log: ${log.message}")
         logDao.insert(log.toEntity())
+        android.util.Log.d("ActivityLogRepo", "Log inserted successfully")
         if (networkMonitor.isOnline()) {
             try {
                 firestoreService.uploadLog(log)
                 logDao.markAsSynced(log.id)
-            } catch (e: Exception) { /* retry nanti */ }
+                android.util.Log.d("ActivityLogRepo", "Log synced to Firestore")
+            } catch (e: Exception) {
+                android.util.Log.e("ActivityLogRepo", "Sync failed: ${e.message}")
+            }
         }
     }
 

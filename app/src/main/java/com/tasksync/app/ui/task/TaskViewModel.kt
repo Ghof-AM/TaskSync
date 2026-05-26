@@ -14,6 +14,7 @@ import com.tasksync.app.domain.usecase.task.CreateTaskUseCase
 import com.tasksync.app.domain.usecase.task.DeleteTaskUseCase
 import com.tasksync.app.domain.usecase.task.GetAllTasksUseCase
 import com.tasksync.app.domain.usecase.task.UpdateTaskStatusUseCase
+import com.tasksync.app.domain.usecase.task.EditTaskUseCase
 import com.tasksync.app.util.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +33,9 @@ class TaskViewModel @Inject constructor(
     private val createTaskUseCase: CreateTaskUseCase,
     private val updateTaskStatusUseCase: UpdateTaskStatusUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
+    private val editTaskUseCase: EditTaskUseCase,       // tambahkan
     private val memberRepository: ProjectMemberRepository,
-    private val taskRepository: TaskRepository,  // tambahkan ini
+    private val taskRepository: TaskRepository,
     private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
@@ -99,7 +101,7 @@ class TaskViewModel @Inject constructor(
                     isSynced = false,
                     updatedAt = System.currentTimeMillis()
                 )
-                taskRepository.updateTask(updated)
+                editTaskUseCase(updated)  // pakai use case, bukan repository langsung
                 _editState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _editState.value = UiState.Error(e.message ?: "Gagal mengubah task")

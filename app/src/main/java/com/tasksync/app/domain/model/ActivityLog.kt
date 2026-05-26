@@ -1,7 +1,9 @@
 package com.tasksync.app.domain.model
 
+import java.util.UUID
+
 data class ActivityLog(
-    val id: String = "",
+    val id: String = UUID.randomUUID().toString(),  // ← pastikan ada default UUID
     val projectId: String = "",
     val actorId: String = "",
     val actorName: String = "",

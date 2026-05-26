@@ -17,6 +17,7 @@ import com.tasksync.app.ui.task.TaskDetailScreen
 import com.tasksync.app.ui.profile.ProfileScreen
 import com.tasksync.app.ui.team.TeamScreen
 import com.tasksync.app.ui.task.EditTaskScreen
+import com.tasksync.app.ui.log.ActivityLogScreen
 
 @Composable
 fun NavGraph(
@@ -89,6 +90,9 @@ fun NavGraph(
                 },
                 onNavigateToProfile = {
                     navController.navigate(Screen.Profile.route)
+                },
+                onNavigateToActivityLog = {
+                    navController.navigate(Screen.ActivityLog.createRoute(projectId))
                 }
             )
         }
@@ -163,6 +167,19 @@ fun NavGraph(
                 projectId = projectId,
                 onNavigateBack = { navController.popBackStack() },
                 onTaskUpdated = { navController.popBackStack() }
+            )
+        }
+        // Activity Log
+        composable(
+            route = Screen.ActivityLog.route,
+            arguments = listOf(
+                navArgument("projectId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val projectId = backStackEntry.arguments?.getString("projectId") ?: ""
+            ActivityLogScreen(
+                projectId = projectId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

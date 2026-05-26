@@ -9,7 +9,9 @@ fun ActivityLogEntity.toDomain(): ActivityLog = ActivityLog(
     projectId = projectId,
     actorId = actorId,
     actorName = actorName,
-    eventType = runCatching { LogEvent.valueOf(eventType) }.getOrDefault(LogEvent.TASK_CREATED),
+    eventType = runCatching {
+        LogEvent.valueOf(eventType)
+    }.getOrDefault(LogEvent.TASK_CREATED), // fallback aman
     message = message,
     targetId = targetId,
     isSynced = isSynced,
@@ -17,7 +19,7 @@ fun ActivityLogEntity.toDomain(): ActivityLog = ActivityLog(
 )
 
 fun ActivityLog.toEntity(): ActivityLogEntity = ActivityLogEntity(
-    id = id,
+    id = id,  // ← pastikan id dari domain model terbawa
     projectId = projectId,
     actorId = actorId,
     actorName = actorName,

@@ -92,6 +92,11 @@ class FirestoreService @Inject constructor(
 
     // Activity Log
     suspend fun uploadLog(log: ActivityLog) {
+        android.util.Log.d("FirestoreService", "Uploading log id: '${log.id}', msg: ${log.message}")
+        if (log.id.isBlank()) {
+            android.util.Log.e("FirestoreService", "Log ID is blank!")
+            return
+        }
         firestore.collection(Constants.COLLECTION_ACTIVITY_LOG)
             .document(log.id)
             .set(log.toFirestoreMap())
