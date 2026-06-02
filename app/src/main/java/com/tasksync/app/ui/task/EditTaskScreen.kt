@@ -305,8 +305,8 @@ fun EditTaskScreen(
                             title = title,
                             description = description,
                             assignedTo = selectedMember?.userId ?: "",
-                            assignedToName = selectedMember?.userName
-                                ?: selectedMember?.userEmail ?: "",
+                            assignedToName = selectedMember?.userName?.takeIf
+                            { it.isNotBlank() } ?: selectedMember?.userEmail ?: "",
                             priority = selectedPriority,
                             deadline = deadline
                         )
