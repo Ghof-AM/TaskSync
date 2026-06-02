@@ -44,7 +44,7 @@ class ProjectRepositoryImpl @Inject constructor(
         // 4. Sync ke Firestore jika online
         if (networkMonitor.isOnline()) {
             try {
-                firestoreService.uploadProject(project)
+                firestoreService.uploadProject(project, listOf(creatorId))
                 projectDao.markAsSynced(project.id)
             } catch (e: Exception) {
                 android.util.Log.e("ProjectRepo", "Sync failed: ${e.message}")
@@ -59,7 +59,10 @@ class ProjectRepositoryImpl @Inject constructor(
     override suspend fun syncAllPending() {
         projectDao.getUnsyncedProjects().forEach { entity ->
             try {
-                firestoreService.uploadProject(entity.toDomain())
+                // Ambil daftar member lokal untuk project ini agar data Firestore sinkron
+                val memberIds = memberRepository.getMemberIdsForProject(entity.id)
+
+                firestoreService.uploadProject(entity.toDomain(), memberIds)
                 projectDao.markAsSynced(entity.id)
             } catch (e: Exception) { /* skip */ }
         }

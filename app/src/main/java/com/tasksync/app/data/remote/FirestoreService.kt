@@ -1,6 +1,7 @@
 package com.tasksync.app.data.remote
 
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.tasksync.app.data.mapper.toFirestoreMap
 import com.tasksync.app.domain.model.ActivityLog
@@ -103,10 +104,14 @@ class FirestoreService @Inject constructor(
             .await()
     }
     // Projects
-    suspend fun uploadProject(project: Project) {
+    suspend fun uploadProject(project: Project, memberIds: List<String>) {
+        val projectMap = project.toFirestoreMap().toMutableMap().apply {
+            put("memberIds", memberIds)
+        }
+
         firestore.collection(Constants.COLLECTION_TEAMS)
             .document(project.id)
-            .set(project.toFirestoreMap())
+            .set(projectMap)
             .await()
     }
 
@@ -117,6 +122,12 @@ class FirestoreService @Inject constructor(
             .await()
             .documents
             .map { it.data ?: emptyMap() }
+    }
+    suspend fun addProjectMemberRemote(projectId: String, userId: String) {
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(projectId)
+            .update("memberIds", FieldValue.arrayUnion(userId))
+            .await()
     }
     suspend fun getCommentsByTask(taskId: String): List<Map<String, Any?>> {
         return firestore.collection(Constants.COLLECTION_COMMENTS)

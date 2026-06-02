@@ -12,5 +12,6 @@ interface ProjectMemberRepository {
     suspend fun updateRole(projectId: String, userId: String, role: UserRole)
     suspend fun removeMember(projectId: String, userId: String)
     suspend fun refreshMemberName(projectId: String, userId: String, name: String, email: String)
-
+    suspend fun getMemberIdsForProject(projectId: String): List<String>
+    suspend fun syncAllPending()
 }
