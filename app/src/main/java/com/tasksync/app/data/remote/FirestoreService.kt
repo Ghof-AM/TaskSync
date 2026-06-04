@@ -22,11 +22,6 @@ class FirestoreService @Inject constructor(
 ) {
     // ─── REAL-TIME LISTENERS ──────────────────────────────────────────────────
 
-    /**
-     * Mendengarkan perubahan task secara real-time untuk satu project.
-     * Setiap kali ada task yang dibuat/diubah/dihapus di Firestore oleh siapapun,
-     * Flow ini akan emit list terbaru ke collector-nya (TaskRepositoryImpl).
-     */
     fun listenToTasksByProject(projectId: String): Flow<List<Map<String, Any?>>> =
         callbackFlow {
             val listener = firestore.collection(Constants.COLLECTION_TASKS)
@@ -40,14 +35,9 @@ class FirestoreService @Inject constructor(
                     val result = snapshot?.documents?.map { it.data ?: emptyMap() } ?: emptyList()
                     trySend(result)
                 }
-            // Listener dibersihkan otomatis saat Flow di-cancel (misal: ViewModel cleared)
             awaitClose { listener.remove() }
         }
 
-    /**
-     * Mendengarkan perubahan project secara real-time untuk satu user.
-     * Akan trigger setiap kali user diundang ke project baru, atau project diubah.
-     */
     fun listenToProjectsByUser(userId: String): Flow<List<Map<String, Any?>>> =
         callbackFlow {
             val listener = firestore.collection(Constants.COLLECTION_TEAMS)
@@ -55,6 +45,29 @@ class FirestoreService @Inject constructor(
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         android.util.Log.e("FirestoreService", "Project listener error: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    val result = snapshot?.documents?.map { it.data ?: emptyMap() } ?: emptyList()
+                    trySend(result)
+                }
+            awaitClose { listener.remove() }
+        }
+
+    /**
+     * Listener real-time untuk member sebuah project.
+     * Firestore menyimpan member di sub-collection "members" di dalam document project.
+     * Setiap kali ada perubahan role atau member dihapus/ditambah,
+     * Flow ini emit list terbaru ke collector (ProjectMemberRepositoryImpl).
+     */
+    fun listenToMembersByProject(projectId: String): Flow<List<Map<String, Any?>>> =
+        callbackFlow {
+            val listener = firestore
+                .collection(Constants.COLLECTION_TEAMS)
+                .document(projectId)
+                .collection("members")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        android.util.Log.e("FirestoreService", "Member listener error: ${error.message}")
                         return@addSnapshotListener
                     }
                     val result = snapshot?.documents?.map { it.data ?: emptyMap() } ?: emptyList()
@@ -83,10 +96,8 @@ class FirestoreService @Inject constructor(
         return firestore.collection(Constants.COLLECTION_TASKS)
             .whereEqualTo("projectId", projectId)
             .whereEqualTo("isDeleted", false)
-            .get()
-            .await()
-            .documents
-            .map { it.data ?: emptyMap() }
+            .get().await()
+            .documents.map { it.data ?: emptyMap() }
     }
 
     // ─── COMMENTS ─────────────────────────────────────────────────────────────
@@ -105,6 +116,13 @@ class FirestoreService @Inject constructor(
             .await()
     }
 
+    suspend fun getCommentsByTask(taskId: String): List<Map<String, Any?>> {
+        return firestore.collection(Constants.COLLECTION_COMMENTS)
+            .whereEqualTo("taskId", taskId)
+            .get().await()
+            .documents.map { it.data ?: emptyMap() }
+    }
+
     // ─── USERS ────────────────────────────────────────────────────────────────
 
     suspend fun uploadUser(user: User) {
@@ -118,18 +136,14 @@ class FirestoreService @Inject constructor(
         return firestore.collection(Constants.COLLECTION_USERS)
             .whereEqualTo("email", email)
             .limit(1)
-            .get()
-            .await()
-            .documents
-            .firstOrNull()
-            ?.data
+            .get().await()
+            .documents.firstOrNull()?.data
     }
 
     suspend fun getUserById(userId: String): Map<String, Any?>? {
         return firestore.collection(Constants.COLLECTION_USERS)
             .document(userId)
-            .get()
-            .await()
+            .get().await()
             .data
     }
 
@@ -143,11 +157,7 @@ class FirestoreService @Inject constructor(
     // ─── ACTIVITY LOG ─────────────────────────────────────────────────────────
 
     suspend fun uploadLog(log: ActivityLog) {
-        android.util.Log.d("FirestoreService", "Uploading log id: '${log.id}', msg: ${log.message}")
-        if (log.id.isBlank()) {
-            android.util.Log.e("FirestoreService", "Log ID is blank!")
-            return
-        }
+        if (log.id.isBlank()) return
         firestore.collection(Constants.COLLECTION_ACTIVITY_LOG)
             .document(log.id)
             .set(log.toFirestoreMap())
@@ -169,10 +179,8 @@ class FirestoreService @Inject constructor(
     suspend fun getProjectsByUser(userId: String): List<Map<String, Any?>> {
         return firestore.collection(Constants.COLLECTION_TEAMS)
             .whereArrayContains("memberIds", userId)
-            .get()
-            .await()
-            .documents
-            .map { it.data ?: emptyMap() }
+            .get().await()
+            .documents.map { it.data ?: emptyMap() }
     }
 
     suspend fun addProjectMemberRemote(projectId: String, userId: String) {
@@ -180,14 +188,42 @@ class FirestoreService @Inject constructor(
             .document(projectId)
             .update("memberIds", FieldValue.arrayUnion(userId))
             .await()
+        // Simpan juga di sub-collection members agar listener bisa detect perubahan role
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(projectId)
+            .collection("members")
+            .document(userId)
+            .set(mapOf("userId" to userId, "role" to "member"))
+            .await()
     }
 
-    suspend fun getCommentsByTask(taskId: String): List<Map<String, Any?>> {
-        return firestore.collection(Constants.COLLECTION_COMMENTS)
-            .whereEqualTo("taskId", taskId)
-            .get()
+    /**
+     * Update role member di sub-collection members Firestore.
+     * Ini yang akan di-detect oleh listenToMembersByProject di user lain.
+     */
+    suspend fun updateMemberRoleRemote(projectId: String, userId: String, role: String) {
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(projectId)
+            .collection("members")
+            .document(userId)
+            .update("role", role)
             .await()
-            .documents
-            .map { it.data ?: emptyMap() }
+    }
+
+    /**
+     * Hapus member dari sub-collection members dan arrayUnion memberIds.
+     */
+    suspend fun removeMemberRemote(projectId: String, userId: String) {
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(projectId)
+            .collection("members")
+            .document(userId)
+            .delete()
+            .await()
+
+        firestore.collection(Constants.COLLECTION_TEAMS)
+            .document(projectId)
+            .update("memberIds", FieldValue.arrayRemove(userId))
+            .await()
     }
 }
