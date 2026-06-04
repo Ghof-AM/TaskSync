@@ -15,13 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,13 +51,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.tasksync.app.domain.model.ProjectMember
 import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.util.UiState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +71,10 @@ fun TeamScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showInviteDialog by remember { mutableStateOf(false) }
-    var inviteUserId by remember { mutableStateOf("") }
+    var inviteEmail by remember { mutableStateOf("") }
+
+    // State untuk dialog konfirmasi transfer ownership
+    var transferTargetMember by remember { mutableStateOf<ProjectMember?>(null) }
 
     val isAdmin = currentUserRole == UserRole.OWNER ||
             currentUserRole == UserRole.SECOND_OWNER
@@ -86,13 +88,11 @@ fun TeamScreen(
             is UiState.Success -> {
                 snackbarHostState.showSnackbar("Berhasil!")
                 showInviteDialog = false
-                inviteUserId = ""
+                inviteEmail = ""
                 viewModel.resetActionState()
             }
             is UiState.Error -> {
-                snackbarHostState.showSnackbar(
-                    (actionState as UiState.Error).message
-                )
+                snackbarHostState.showSnackbar((actionState as UiState.Error).message)
                 viewModel.resetActionState()
             }
             else -> {}
@@ -102,15 +102,10 @@ fun TeamScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text("Manajemen Tim", fontWeight = FontWeight.Bold)
-                },
+                title = { Text("Manajemen Tim", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -139,18 +134,14 @@ fun TeamScreen(
         when (val state = membersState) {
             is UiState.Loading -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) { CircularProgressIndicator() }
             }
 
             is UiState.Success -> {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -171,15 +162,11 @@ fun TeamScreen(
                             isCurrentUser = member.userId == viewModel.currentUserId,
                             canManage = isAdmin && member.userId != viewModel.currentUserId,
                             isOwner = currentUserRole == UserRole.OWNER,
-                            onPromote = {
-                                viewModel.promoteMember(projectId, member.userId)
-                            },
-                            onDemote = {
-                                viewModel.demoteMember(projectId, member.userId)
-                            },
-                            onRemove = {
-                                viewModel.removeMember(projectId, member.userId)
-                            }
+                            onPromote = { viewModel.promoteMember(projectId, member.userId) },
+                            onDemote = { viewModel.demoteMember(projectId, member.userId) },
+                            onRemove = { viewModel.removeMember(projectId, member.userId) },
+                            // ← SAMBUNGKAN ke state dialog konfirmasi, bukan langsung panggil
+                            onTransferOwnership = { transferTargetMember = member }
                         )
                     }
                 }
@@ -187,29 +174,21 @@ fun TeamScreen(
 
             is UiState.Error -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = state.message,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Text(text = state.message, color = MaterialTheme.colorScheme.error)
                 }
             }
 
             else -> {}
         }
     }
-    var inviteEmail by remember { mutableStateOf("") }
-    // Invite Dialog
+
+    // Dialog undang anggota
     if (showInviteDialog) {
         AlertDialog(
-            onDismissRequest = {
-                showInviteDialog = false
-                inviteEmail = ""
-            },
+            onDismissRequest = { showInviteDialog = false; inviteEmail = "" },
             title = { Text("Undang Anggota") },
             text = {
                 Column {
@@ -224,9 +203,7 @@ fun TeamScreen(
                         onValueChange = { inviteEmail = it },
                         label = { Text("Email") },
                         placeholder = { Text("contoh@email.com") },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -234,27 +211,54 @@ fun TeamScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        viewModel.inviteMember(projectId, inviteEmail)
-                    },
-                    enabled = inviteEmail.contains("@") &&
-                            actionState !is UiState.Loading
+                    onClick = { viewModel.inviteMember(projectId, inviteEmail) },
+                    enabled = inviteEmail.contains("@") && actionState !is UiState.Loading
                 ) {
                     if (actionState is UiState.Loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
                         Text("Undang")
                     }
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showInviteDialog = false
-                    inviteEmail = ""
-                }) { Text("Batal") }
+                TextButton(onClick = { showInviteDialog = false; inviteEmail = "" }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Dialog konfirmasi transfer ownership
+    // Muncul saat transferTargetMember tidak null, dismiss = batalkan
+    transferTargetMember?.let { target ->
+        AlertDialog(
+            onDismissRequest = { transferTargetMember = null },
+            title = { Text("Transfer Ownership") },
+            text = {
+                Text(
+                    "Anda akan menyerahkan ownership project kepada " +
+                            "\"${target.userName.ifBlank { target.userEmail }}\". " +
+                            "Anda akan menjadi Member biasa. Lanjutkan?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.transferOwnership(projectId, target.userId)
+                        transferTargetMember = null
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Ya, Transfer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { transferTargetMember = null }) {
+                    Text("Batal")
+                }
             }
         )
     }
@@ -268,7 +272,8 @@ fun MemberCard(
     isOwner: Boolean,
     onPromote: () -> Unit,
     onDemote: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onTransferOwnership: () -> Unit   // ← parameter baru
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -282,12 +287,9 @@ fun MemberCard(
         )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
             Surface(
                 modifier = Modifier.size(44.dp),
                 shape = CircleShape,
@@ -321,7 +323,6 @@ fun MemberCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        // Tampilkan userName jika ada, fallback ke email, lalu userId
                         text = when {
                             member.userName.isNotBlank() -> member.userName
                             member.userEmail.isNotBlank() -> member.userEmail
@@ -344,7 +345,6 @@ fun MemberCard(
                         }
                     }
                 }
-                // Tampilkan email jika userName ada
                 if (member.userName.isNotBlank() && member.userEmail.isNotBlank()) {
                     Text(
                         text = member.userEmail,
@@ -363,14 +363,10 @@ fun MemberCard(
                 )
             }
 
-            // Menu actions (admin only, not for self)
             if (canManage) {
                 Box {
                     IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "Opsi"
-                        )
+                        Icon(Icons.Default.MoreVert, contentDescription = "Opsi")
                     }
                     DropdownMenu(
                         expanded = showMenu,
@@ -379,22 +375,21 @@ fun MemberCard(
                         if (member.role == UserRole.MEMBER) {
                             DropdownMenuItem(
                                 text = { Text("Angkat jadi 2nd Owner") },
-                                onClick = {
-                                    showMenu = false
-                                    onPromote()
-                                }
+                                onClick = { showMenu = false; onPromote() }
                             )
                         }
                         if (member.role == UserRole.SECOND_OWNER) {
                             DropdownMenuItem(
                                 text = { Text("Turunkan jadi Member") },
-                                onClick = {
-                                    showMenu = false
-                                    onDemote()
-                                }
+                                onClick = { showMenu = false; onDemote() }
                             )
                         }
                         if (isOwner) {
+                            DropdownMenuItem(
+                                text = { Text("Transfer Ownership") },
+                                // ← panggil onTransferOwnership, bukan langsung viewModel
+                                onClick = { showMenu = false; onTransferOwnership() }
+                            )
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -402,10 +397,7 @@ fun MemberCard(
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 },
-                                onClick = {
-                                    showMenu = false
-                                    onRemove()
-                                }
+                                onClick = { showMenu = false; onRemove() }
                             )
                         }
                     }

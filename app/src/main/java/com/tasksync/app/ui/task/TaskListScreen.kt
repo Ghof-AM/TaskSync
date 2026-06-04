@@ -1,5 +1,8 @@
 package com.tasksync.app.ui.task
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,10 +23,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,9 +69,6 @@ import com.tasksync.app.util.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.History
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,17 +80,24 @@ fun TaskListScreen(
     onNavigateToCreate: () -> Unit,
     onNavigateToTeam: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToActivityLog: () -> Unit,  // tambahkan
+    onNavigateToActivityLog: () -> Unit,
     viewModel: TaskViewModel = hiltViewModel()
 ) {
     val tasksState by viewModel.tasksState.collectAsState()
     val createState by viewModel.createState.collectAsState()
     val userRole by viewModel.userRole.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Tentukan apakah user adalah admin berdasarkan StateFlow
     val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
+
+    // Tampilkan snackbar saat kembali online agar user tahu data sedang diupload
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            snackbarHostState.showSnackbar("✓ Kembali online — menyinkronkan data...")
+        }
+    }
 
     LaunchedEffect(projectId) {
         viewModel.loadTasks(projectId)
@@ -151,7 +163,6 @@ fun TaskListScreen(
             )
         },
         floatingActionButton = {
-            // Gunakan isAdmin dari StateFlow, bukan fungsi biasa
             if (isAdmin) {
                 FloatingActionButton(
                     onClick = onNavigateToCreate,
@@ -172,6 +183,38 @@ fun TaskListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Banner offline — muncul/hilang dengan animasi slide
+            AnimatedVisibility(
+                visible = !isOnline,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Tidak ada koneksi — task tersimpan lokal dan akan dikirim saat online",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
             // Filter chips
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -216,9 +259,7 @@ fun TaskListScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = if (selectedFilter == null)
                                         "Belum ada task"
@@ -226,7 +267,6 @@ fun TaskListScreen(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                // Gunakan isAdmin dari StateFlow
                                 if (isAdmin) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -248,7 +288,6 @@ fun TaskListScreen(
                             ) { task ->
                                 TaskCard(
                                     task = task,
-                                    // Gunakan isAdmin dari StateFlow
                                     isAdmin = isAdmin,
                                     onClick = { onNavigateToDetail(task.id) },
                                     onStatusToggle = {
@@ -259,9 +298,7 @@ fun TaskListScreen(
                                         }
                                         viewModel.updateStatus(task.id, newStatus)
                                     },
-                                    onDelete = {
-                                        viewModel.deleteTask(task.id)
-                                    }
+                                    onDelete = { viewModel.deleteTask(task.id) }
                                 )
                             }
                         }
@@ -309,7 +346,6 @@ fun TaskCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Status toggle button
             IconButton(
                 onClick = onStatusToggle,
                 modifier = Modifier.size(36.dp)
@@ -329,13 +365,11 @@ fun TaskCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Task info
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Priority badge
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
@@ -349,8 +383,6 @@ fun TaskCard(
                             fontWeight = FontWeight.Medium
                         )
                     }
-
-                    // Status badge
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
@@ -375,8 +407,7 @@ fun TaskCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (task.status == TaskStatus.DONE)
-                        TextDecoration.LineThrough
-                    else TextDecoration.None
+                        TextDecoration.LineThrough else TextDecoration.None
                 )
 
                 if (task.description.isNotBlank()) {
@@ -390,7 +421,6 @@ fun TaskCard(
                     )
                 }
 
-                // Setelah description text, tambahkan:
                 if (task.assignedToName.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -416,7 +446,6 @@ fun TaskCard(
                 }
             }
 
-            // Delete button (admin only)
             if (isAdmin) {
                 IconButton(
                     onClick = onDelete,
@@ -433,7 +462,6 @@ fun TaskCard(
     }
 }
 
-// Extension functions untuk display
 fun TaskStatus.displayName(): String = when (this) {
     TaskStatus.TODO -> "Todo"
     TaskStatus.IN_PROGRESS -> "In Progress"

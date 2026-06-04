@@ -12,8 +12,9 @@ data class ProjectMemberEntity(
     val projectId: String = "",
     val userId: String = "",
     val role: String = "member",
-    val userName: String = "",      // tambahkan
-    val userEmail: String = "",     // tambahkan
+    val userName: String = "",
+    val userEmail: String = "",
+    val userPhotoUrl: String = "",   // ← tambahkan ini
     val joinedAt: Long = System.currentTimeMillis(),
     val isSynced: Boolean = false
 )

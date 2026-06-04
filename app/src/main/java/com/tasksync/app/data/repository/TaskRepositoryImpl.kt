@@ -36,6 +36,8 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun getTaskById(taskId: String): Task? =
         taskDao.getTaskById(taskId)?.toDomain()
 
+    override fun getTaskFlow(taskId: String): Flow<Task?> =
+        taskDao.getTaskByIdFlow(taskId).map { entity -> entity?.toDomain() }
     /**
      * Mulai mendengarkan Firestore secara real-time untuk projectId tertentu.
      *
