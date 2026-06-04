@@ -3,6 +3,7 @@ package com.tasksync.app.util
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
@@ -17,7 +18,20 @@ import javax.inject.Singleton
 class SyncManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    fun schedule() {
+    /**
+     * Jadwalkan SyncWorker periodik.
+     * userId wajib diisi — tanpa ini worker langsung gagal di baris pertama.
+     * Gunakan ExistingPeriodicWorkPolicy.UPDATE agar jika sudah ada
+     * jadwal sebelumnya (dari login sesi lama), langsung diperbarui
+     * dengan userId yang baru.
+     */
+    fun schedule(userId: String) {
+        if (userId.isBlank()) return
+
+        val inputData = Data.Builder()
+            .putString(SyncWorker.KEY_USER_ID, userId)
+            .build()
+
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -26,6 +40,7 @@ class SyncManager @Inject constructor(
             Constants.SYNC_INTERVAL_MINUTES,
             TimeUnit.MINUTES
         )
+            .setInputData(inputData)
             .setConstraints(constraints)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
@@ -36,7 +51,7 @@ class SyncManager @Inject constructor(
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             SyncWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
     }

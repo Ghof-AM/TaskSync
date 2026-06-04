@@ -1,6 +1,7 @@
 package com.tasksync.app.worker
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.tasksync.app.domain.repository.ActivityLogRepository
@@ -8,7 +9,6 @@ import com.tasksync.app.domain.repository.CommentRepository
 import com.tasksync.app.domain.repository.ProjectMemberRepository
 import com.tasksync.app.domain.repository.ProjectRepository
 import com.tasksync.app.domain.usecase.task.SyncTasksUseCase
-import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -24,12 +24,14 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val currentUserId = inputData.getString("USER_ID") ?: return Result.failure()
+        val currentUserId = inputData.getString(KEY_USER_ID)
+            ?: return Result.failure()
+
         return try {
-            // PERBAIKAN: Menghapus argumen 'context' karena interface hanya membutuhkan 'currentUserId'
+            // 1. PULL: Ambil project baru dari Firestore (undangan, dll)
             projectRepository.fetchRemoteProjectsAndNotify(currentUserId)
 
-            // 2. PUSH DATA: Jalankan antrean upload offline seperti biasa
+            // 2. PUSH: Upload semua data offline yang belum tersync
             projectRepository.syncAllPending()
             memberRepository.syncAllPending()
             syncTasksUseCase()
@@ -44,5 +46,6 @@ class SyncWorker @AssistedInject constructor(
 
     companion object {
         const val WORK_NAME = "tasksync_sync_worker"
+        const val KEY_USER_ID = "USER_ID"
     }
 }
