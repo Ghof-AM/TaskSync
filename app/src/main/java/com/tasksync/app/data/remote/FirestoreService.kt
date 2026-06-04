@@ -1,6 +1,5 @@
 package com.tasksync.app.data.remote
 
-
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.tasksync.app.data.mapper.toFirestoreMap
@@ -10,6 +9,9 @@ import com.tasksync.app.domain.model.Project
 import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.User
 import com.tasksync.app.util.Constants
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,7 +20,51 @@ import javax.inject.Singleton
 class FirestoreService @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    // Tasks
+    // ─── REAL-TIME LISTENERS ──────────────────────────────────────────────────
+
+    /**
+     * Mendengarkan perubahan task secara real-time untuk satu project.
+     * Setiap kali ada task yang dibuat/diubah/dihapus di Firestore oleh siapapun,
+     * Flow ini akan emit list terbaru ke collector-nya (TaskRepositoryImpl).
+     */
+    fun listenToTasksByProject(projectId: String): Flow<List<Map<String, Any?>>> =
+        callbackFlow {
+            val listener = firestore.collection(Constants.COLLECTION_TASKS)
+                .whereEqualTo("projectId", projectId)
+                .whereEqualTo("isDeleted", false)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        android.util.Log.e("FirestoreService", "Task listener error: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    val result = snapshot?.documents?.map { it.data ?: emptyMap() } ?: emptyList()
+                    trySend(result)
+                }
+            // Listener dibersihkan otomatis saat Flow di-cancel (misal: ViewModel cleared)
+            awaitClose { listener.remove() }
+        }
+
+    /**
+     * Mendengarkan perubahan project secara real-time untuk satu user.
+     * Akan trigger setiap kali user diundang ke project baru, atau project diubah.
+     */
+    fun listenToProjectsByUser(userId: String): Flow<List<Map<String, Any?>>> =
+        callbackFlow {
+            val listener = firestore.collection(Constants.COLLECTION_TEAMS)
+                .whereArrayContains("memberIds", userId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        android.util.Log.e("FirestoreService", "Project listener error: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    val result = snapshot?.documents?.map { it.data ?: emptyMap() } ?: emptyList()
+                    trySend(result)
+                }
+            awaitClose { listener.remove() }
+        }
+
+    // ─── TASKS ────────────────────────────────────────────────────────────────
+
     suspend fun uploadTask(task: Task) {
         firestore.collection(Constants.COLLECTION_TASKS)
             .document(task.id)
@@ -43,7 +89,8 @@ class FirestoreService @Inject constructor(
             .map { it.data ?: emptyMap() }
     }
 
-    // Comments
+    // ─── COMMENTS ─────────────────────────────────────────────────────────────
+
     suspend fun uploadComment(comment: Comment) {
         firestore.collection(Constants.COLLECTION_COMMENTS)
             .document(comment.id)
@@ -58,7 +105,8 @@ class FirestoreService @Inject constructor(
             .await()
     }
 
-    // Users
+    // ─── USERS ────────────────────────────────────────────────────────────────
+
     suspend fun uploadUser(user: User) {
         firestore.collection(Constants.COLLECTION_USERS)
             .document(user.id)
@@ -76,6 +124,7 @@ class FirestoreService @Inject constructor(
             .firstOrNull()
             ?.data
     }
+
     suspend fun getUserById(userId: String): Map<String, Any?>? {
         return firestore.collection(Constants.COLLECTION_USERS)
             .document(userId)
@@ -91,7 +140,8 @@ class FirestoreService @Inject constructor(
             .await()
     }
 
-    // Activity Log
+    // ─── ACTIVITY LOG ─────────────────────────────────────────────────────────
+
     suspend fun uploadLog(log: ActivityLog) {
         android.util.Log.d("FirestoreService", "Uploading log id: '${log.id}', msg: ${log.message}")
         if (log.id.isBlank()) {
@@ -103,12 +153,13 @@ class FirestoreService @Inject constructor(
             .set(log.toFirestoreMap())
             .await()
     }
-    // Projects
+
+    // ─── PROJECTS ─────────────────────────────────────────────────────────────
+
     suspend fun uploadProject(project: Project, memberIds: List<String>) {
         val projectMap = project.toFirestoreMap().toMutableMap().apply {
             put("memberIds", memberIds)
         }
-
         firestore.collection(Constants.COLLECTION_TEAMS)
             .document(project.id)
             .set(projectMap)
@@ -123,16 +174,17 @@ class FirestoreService @Inject constructor(
             .documents
             .map { it.data ?: emptyMap() }
     }
+
     suspend fun addProjectMemberRemote(projectId: String, userId: String) {
         firestore.collection(Constants.COLLECTION_TEAMS)
             .document(projectId)
             .update("memberIds", FieldValue.arrayUnion(userId))
             .await()
     }
+
     suspend fun getCommentsByTask(taskId: String): List<Map<String, Any?>> {
         return firestore.collection(Constants.COLLECTION_COMMENTS)
             .whereEqualTo("taskId", taskId)
-            // hapus .orderBy("createdAt") sementara
             .get()
             .await()
             .documents

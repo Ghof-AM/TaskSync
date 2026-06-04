@@ -1,41 +1,44 @@
 package com.tasksync.app.worker
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.tasksync.app.domain.repository.ActivityLogRepository
 import com.tasksync.app.domain.repository.CommentRepository
-import com.tasksync.app.domain.repository.ProjectMemberRepository // Tambahan
-import com.tasksync.app.domain.repository.ProjectRepository // Tambahan
+import com.tasksync.app.domain.repository.ProjectMemberRepository
+import com.tasksync.app.domain.repository.ProjectRepository
 import com.tasksync.app.domain.usecase.task.SyncTasksUseCase
+import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
-    @Assisted context: Context,
+    @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val syncTasksUseCase: SyncTasksUseCase,
     private val commentRepository: CommentRepository,
     private val activityLogRepository: ActivityLogRepository,
-    private val projectRepository: ProjectRepository,       // Tambahan Isu #1
-    private val memberRepository: ProjectMemberRepository // Tambahan Isu #3
+    private val projectRepository: ProjectRepository,
+    private val memberRepository: ProjectMemberRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        val currentUserId = inputData.getString("USER_ID") ?: return Result.failure()
         return try {
-            // Jalankan sync Project & Members terlebih dahulu agar relasi data di Firestore aman
-            projectRepository.syncAllPending()   // Mengatasi Isu #1
-            memberRepository.syncAllPending()    // Mengatasi Isu #3
+            // PERBAIKAN: Menghapus argumen 'context' karena interface hanya membutuhkan 'currentUserId'
+            projectRepository.fetchRemoteProjectsAndNotify(currentUserId)
 
+            // 2. PUSH DATA: Jalankan antrean upload offline seperti biasa
+            projectRepository.syncAllPending()
+            memberRepository.syncAllPending()
             syncTasksUseCase()
             commentRepository.syncAllPending()
             activityLogRepository.syncAllPending()
+
             Result.success()
         } catch (e: Exception) {
-            if (runAttemptCount < 3) Result.retry()
-            else Result.failure()
+            if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }
 

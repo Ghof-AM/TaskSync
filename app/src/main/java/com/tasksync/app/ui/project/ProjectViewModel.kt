@@ -33,11 +33,23 @@ class ProjectViewModel @Inject constructor(
         get() = firebaseAuth.currentUser?.uid ?: ""
 
     init {
+        // Langsung load + mulai listener saat ViewModel dibuat.
+        // Karena ViewModel di-scope ke NavBackStackEntry, listener ini hidup
+        // selama user berada di halaman project list, dan mati otomatis saat
+        // user keluar (ViewModel cleared → coroutine dibatalkan).
         loadProjects()
     }
 
     private fun loadProjects() {
         val uid = firebaseAuth.currentUser?.uid ?: return
+
+        // Mulai listener Firestore real-time untuk user ini.
+        // Listener akan push project baru ke Room setiap ada perubahan dari siapapun
+        // (termasuk ketika user diundang ke project oleh user lain).
+        projectRepository.startListening(uid)
+
+        // Observe Room Flow. Setiap kali listener di atas upsert data baru ke Room,
+        // Flow ini akan emit ulang dan UI otomatis refresh.
         projectRepository.getProjectsByUser(uid)
             .onEach { projects ->
                 _projectsState.value = UiState.Success(projects)
@@ -53,11 +65,13 @@ class ProjectViewModel @Inject constructor(
         viewModelScope.launch {
             _createState.value = UiState.Loading
             try {
+                require(name.isNotBlank()) { "Nama project tidak boleh kosong" }
                 val project = Project(
                     id = UUID.randomUUID().toString(),
                     name = name.trim(),
                     description = description.trim(),
-                    createdBy = uid
+                    createdBy = uid,
+                    createdAt = System.currentTimeMillis()
                 )
                 projectRepository.createProject(project, uid)
                 _createState.value = UiState.Success(Unit)

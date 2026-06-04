@@ -47,4 +47,7 @@ interface ProjectMemberDao {
     // TAMBAHAN 3: Mengubah status isSynced menjadi true (1 dalam SQLite) setelah sukses upload
     @Query("UPDATE project_members SET isSynced = 1 WHERE projectId = :projectId AND userId = :userId")
     suspend fun markAsSynced(projectId: String, userId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMemberLocally(member: ProjectMemberEntity)
 }

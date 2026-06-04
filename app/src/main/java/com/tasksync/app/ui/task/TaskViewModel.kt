@@ -12,9 +12,9 @@ import com.tasksync.app.domain.repository.ProjectMemberRepository
 import com.tasksync.app.domain.repository.TaskRepository
 import com.tasksync.app.domain.usecase.task.CreateTaskUseCase
 import com.tasksync.app.domain.usecase.task.DeleteTaskUseCase
+import com.tasksync.app.domain.usecase.task.EditTaskUseCase
 import com.tasksync.app.domain.usecase.task.GetAllTasksUseCase
 import com.tasksync.app.domain.usecase.task.UpdateTaskStatusUseCase
-import com.tasksync.app.domain.usecase.task.EditTaskUseCase
 import com.tasksync.app.util.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,7 +32,7 @@ class TaskViewModel @Inject constructor(
     private val createTaskUseCase: CreateTaskUseCase,
     private val updateTaskStatusUseCase: UpdateTaskStatusUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
-    private val editTaskUseCase: EditTaskUseCase,       // tambahkan
+    private val editTaskUseCase: EditTaskUseCase,
     private val memberRepository: ProjectMemberRepository,
     private val taskRepository: TaskRepository,
     private val firebaseAuth: FirebaseAuth
@@ -51,18 +50,34 @@ class TaskViewModel @Inject constructor(
     private val _selectedFilter = MutableStateFlow<TaskStatus?>(null)
     val selectedFilter: StateFlow<TaskStatus?> = _selectedFilter.asStateFlow()
 
-    // Tambahkan ini
     private val _projectMembers = MutableStateFlow<List<ProjectMember>>(emptyList())
     val projectMembers: StateFlow<List<ProjectMember>> = _projectMembers.asStateFlow()
-
-    val currentUserId: String
-        get() = firebaseAuth.currentUser?.uid ?: ""
 
     private val _taskDetail = MutableStateFlow<Task?>(null)
     val taskDetail: StateFlow<Task?> = _taskDetail.asStateFlow()
 
     private val _editState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val editState: StateFlow<UiState<Unit>> = _editState.asStateFlow()
+
+    val currentUserId: String
+        get() = firebaseAuth.currentUser?.uid ?: ""
+
+    fun loadTasks(projectId: String) {
+        // Mulai listener Firestore real-time untuk project ini.
+        // Listener akan push data baru ke Room setiap ada perubahan dari user manapun.
+        // getAllTasksUseCase mengambil dari Room (Flow), sehingga UI otomatis refresh
+        // tanpa perlu polling atau restart.
+        taskRepository.startListening(projectId)
+
+        getAllTasksUseCase(projectId)
+            .onEach { tasks ->
+                _tasksState.value = UiState.Success(tasks)
+            }
+            .catch { e ->
+                _tasksState.value = UiState.Error(e.message ?: "Gagal memuat task")
+            }
+            .launchIn(viewModelScope)
+    }
 
     fun loadTaskForEdit(taskId: String) {
         viewModelScope.launch {
@@ -101,7 +116,7 @@ class TaskViewModel @Inject constructor(
                     isSynced = false,
                     updatedAt = System.currentTimeMillis()
                 )
-                editTaskUseCase(updated)  // pakai use case, bukan repository langsung
+                editTaskUseCase(updated)
                 _editState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _editState.value = UiState.Error(e.message ?: "Gagal mengubah task")
@@ -113,17 +128,6 @@ class TaskViewModel @Inject constructor(
         _editState.value = UiState.Idle
     }
 
-    fun loadTasks(projectId: String) {
-        getAllTasksUseCase(projectId)
-            .onEach { tasks ->
-                _tasksState.value = UiState.Success(tasks)
-            }
-            .catch { e ->
-                _tasksState.value = UiState.Error(e.message ?: "Gagal memuat task")
-            }
-            .launchIn(viewModelScope)
-    }
-
     fun loadUserRole(projectId: String) {
         viewModelScope.launch {
             val uid = firebaseAuth.currentUser?.uid ?: return@launch
@@ -133,7 +137,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    // Tambahkan fungsi ini
     fun loadProjectMembers(projectId: String) {
         memberRepository.getMembersByProject(projectId)
             .onEach { members ->
@@ -177,9 +180,7 @@ class TaskViewModel @Inject constructor(
                 createTaskUseCase(task)
                 _createState.value = UiState.Success(Unit)
             } catch (e: Exception) {
-                _createState.value = UiState.Error(
-                    e.message ?: "Gagal membuat task"
-                )
+                _createState.value = UiState.Error(e.message ?: "Gagal membuat task")
             }
         }
     }
