@@ -1,5 +1,8 @@
 package com.tasksync.app.ui.task
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,12 +69,13 @@ import java.util.Locale
 fun TaskDetailScreen(
     taskId: String,
     onNavigateBack: () -> Unit,
-    onNavigateToEdit: (taskId: String, projectId: String) -> Unit, // tambahkan
+    onNavigateToEdit: (taskId: String, projectId: String) -> Unit,
     taskDetailViewModel: TaskDetailViewModel = hiltViewModel(),
     commentViewModel: CommentViewModel = hiltViewModel()
 ) {
     val taskState by taskDetailViewModel.taskState.collectAsState()
     val userRole by taskDetailViewModel.userRole.collectAsState()
+    val isOnline by taskDetailViewModel.isOnline.collectAsState()
     val commentsState by commentViewModel.commentsState.collectAsState()
     val addCommentState by commentViewModel.addCommentState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,6 +83,12 @@ fun TaskDetailScreen(
     val currentUser by commentViewModel.currentUser.collectAsState()
 
     val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
+
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            snackbarHostState.showSnackbar("✓ Kembali online — menyinkronkan data...")
+        }
+    }
 
     LaunchedEffect(taskId) {
         taskDetailViewModel.loadTask(taskId)
@@ -104,36 +115,27 @@ fun TaskDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                actions = {
-                    if (isAdmin) {
-                        IconButton(
-                            onClick = {
-                                val task = (taskState as? UiState.Success)?.data
-                                if (task != null) {
-                                    onNavigateToEdit(taskId, task.projectId)
-                                }
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Edit Task",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                    }
-                },
-                title = {
-                    Text(
-                        "Detail Task",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("Detail Task", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Kembali"
                         )
+                    }
+                },
+                actions = {
+                    if (isAdmin) {
+                        IconButton(onClick = {
+                            val task = (taskState as? UiState.Success)?.data
+                            if (task != null) onNavigateToEdit(taskId, task.projectId)
+                        }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Edit Task",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -145,135 +147,163 @@ fun TaskDetailScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        when (val state = taskState) {
-            is UiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Banner offline dengan animasi
+            AnimatedVisibility(
+                visible = !isOnline,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.errorContainer
                 ) {
-                    CircularProgressIndicator()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Tidak ada koneksi — komentar tersimpan lokal",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
 
-            is UiState.Success -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .imePadding()
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+            when (val state = taskState) {
+                is UiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Task info section
-                        item {
-                            TaskInfoSection(
-                                task = state.data,
-                                isAdmin = isAdmin,
-                                onStatusChange = { newStatus ->
-                                    taskDetailViewModel.updateStatus(taskId, newStatus)
-                                }
-                            )
-                        }
+                        CircularProgressIndicator()
+                    }
+                }
 
-                        // Comments header
-                        item {
-                            HorizontalDivider()
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Komentar",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                is UiState.Success -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding()
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            item {
+                                TaskInfoSection(
+                                    task = state.data,
+                                    isAdmin = isAdmin,
+                                    onStatusChange = { newStatus ->
+                                        taskDetailViewModel.updateStatus(taskId, newStatus)
+                                    }
+                                )
+                            }
 
-                        // Comments list
-                        when (val commentState = commentsState) {
-                            is UiState.Success -> {
-                                if (commentState.data.isEmpty()) {
-                                    item {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "Belum ada komentar",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            item {
+                                HorizontalDivider()
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Komentar",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            when (val commentState = commentsState) {
+                                is UiState.Success -> {
+                                    if (commentState.data.isEmpty()) {
+                                        item {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 16.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Belum ada komentar",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        items(
+                                            items = commentState.data,
+                                            key = { it.id }
+                                        ) { comment ->
+                                            CommentItem(
+                                                userName = comment.userName,
+                                                content = comment.content,
+                                                createdAt = comment.createdAt,
+                                                isOwner = comment.userId == commentViewModel.currentUserId,
+                                                onDelete = {
+                                                    commentViewModel.deleteComment(comment.id)
+                                                }
                                             )
                                         }
                                     }
-                                } else {
-                                    items(
-                                        items = commentState.data,
-                                        key = { it.id }
-                                    ) { comment ->
-                                        CommentItem(
-                                            userName = comment.userName,
-                                            content = comment.content,
-                                            createdAt = comment.createdAt,
-                                            isOwner = comment.userId == commentViewModel.currentUserId,
-                                            onDelete = {
-                                                commentViewModel.deleteComment(comment.id)
-                                            }
-                                        )
+                                }
+                                is UiState.Loading -> {
+                                    item {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
                                     }
                                 }
+                                else -> {}
                             }
-                            is UiState.Loading -> {
-                                item {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            else -> {}
                         }
+
+                        HorizontalDivider()
+                        CommentInputBar(
+                            value = commentText,
+                            onValueChange = { commentText = it },
+                            onSend = {
+                                if (commentText.isNotBlank()) {
+                                    commentViewModel.addComment(taskId, commentText)
+                                }
+                            },
+                            isSending = addCommentState is UiState.Loading,
+                            isEnabled = currentUser != null
+                        )
                     }
-
-                    // Comment input
-                    // Comment input — disable jika user belum loaded
-                    HorizontalDivider()
-                    CommentInputBar(
-                        value = commentText,
-                        onValueChange = { commentText = it },
-                        onSend = {
-                            if (commentText.isNotBlank()) {
-                                commentViewModel.addComment(taskId, commentText)
-                            }
-                        },
-                        isSending = addCommentState is UiState.Loading,
-                        isEnabled = currentUser != null  // tambahkan parameter ini
-                    )
                 }
-            }
 
-            is UiState.Error -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.message,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                is UiState.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
-            }
 
-            else -> {}
+                else -> {}
+            }
         }
     }
 }
@@ -296,14 +326,12 @@ fun TaskInfoSection(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Title
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
 
-            // Priority & Status row
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(
                     shape = MaterialTheme.shapes.small,
@@ -331,7 +359,6 @@ fun TaskInfoSection(
                 }
             }
 
-            // Description
             if (task.description.isNotBlank()) {
                 Text(
                     text = task.description,
@@ -340,7 +367,6 @@ fun TaskInfoSection(
                 )
             }
 
-            // Setelah description, tambahkan:
             if (task.assignedToName.isNotBlank()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -360,7 +386,6 @@ fun TaskInfoSection(
                 }
             }
 
-            // Deadline
             if (task.deadline > 0) {
                 val isOverdue = task.deadline < System.currentTimeMillis()
                         && task.status != TaskStatus.DONE
@@ -375,7 +400,6 @@ fun TaskInfoSection(
                 )
             }
 
-            // Status change buttons (semua user bisa update status)
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Text(
                 text = "Ubah Status:",
@@ -393,13 +417,9 @@ fun TaskInfoSection(
                     ) {
                         Text(
                             text = status.displayName(),
-                            modifier = Modifier.padding(
-                                horizontal = 10.dp,
-                                vertical = 6.dp
-                            ),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected)
-                                androidx.compose.ui.graphics.Color.White
+                            color = if (isSelected) androidx.compose.ui.graphics.Color.White
                             else status.color(),
                             fontWeight = FontWeight.Medium
                         )
@@ -422,7 +442,6 @@ fun CommentItem(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
-        // Avatar
         Surface(
             modifier = Modifier
                 .size(36.dp)
@@ -490,7 +509,7 @@ fun CommentInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     isSending: Boolean,
-    isEnabled: Boolean = true  // tambahkan
+    isEnabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
