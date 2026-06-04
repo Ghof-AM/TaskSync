@@ -1,63 +1,66 @@
 package com.tasksync.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
+import com.tasksync.app.domain.repository.UserRepository
 import com.tasksync.app.ui.navigation.NavGraph
 import com.tasksync.app.ui.navigation.Screen
 import com.tasksync.app.ui.profile.ThemeViewModel
 import com.tasksync.app.ui.theme.TaskSyncTheme
 import com.tasksync.app.util.SyncManager
 import com.tasksync.app.util.ThemeManager
-import com.tasksync.app.domain.repository.UserRepository
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import android.util.Log // Pastikan Log diimport
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import com.google.firebase.messaging.FirebaseMessaging // Pastikan FirebaseMessaging diimport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var syncManager: SyncManager
+    @Inject lateinit var syncManager: SyncManager
+    @Inject lateinit var firebaseAuth: FirebaseAuth
+    @Inject lateinit var themeManager: ThemeManager
+    @Inject lateinit var userRepository: UserRepository
 
-    @Inject
-    lateinit var firebaseAuth: FirebaseAuth
+    // Gunakan hiltViewModel factory agar Hilt bisa inject ThemeManager ke ThemeViewModel
+    private val themeViewModel: ThemeViewModel by viewModels(
+        factoryProducer = { defaultViewModelProviderFactory }
+    )
 
-    @Inject
-    lateinit var themeManager: ThemeManager
-
-    @Inject
-    lateinit var userRepository: UserRepository
-
-    private val themeViewModel: ThemeViewModel by viewModels()
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            Log.d("FCM", "Notification permission granted")
-        }
+        if (isGranted) Log.d("FCM", "Notification permission granted")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        syncManager.schedule(firebaseAuth.currentUser?.uid ?: return)
 
+        // PERBAIKAN: jangan pakai ?: return di sini karena akan
+        // menghentikan onCreate sebelum setContent dipanggil → layar putih.
+        // Jadwalkan SyncWorker hanya jika user sudah login, tanpa return.
+        val currentUid = firebaseAuth.currentUser?.uid
+        if (currentUid != null) {
+            syncManager.schedule(currentUid)
+        }
+
+        // Minta izin notifikasi (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -68,17 +71,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Ambil FCM token saat pertama buka
+        // Ambil dan simpan FCM token device ini ke Firestore
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val token = task.result
-                android.util.Log.d("FCM", "Token device ini: $token")
+                Log.d("FCM", "Token device ini: $token")
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         userRepository.updateFcmToken(token)
-                        android.util.Log.d("FCM", "Token berhasil disimpan ke Firestore")
+                        Log.d("FCM", "Token berhasil disimpan ke Firestore")
                     } catch (e: Exception) {
-                        android.util.Log.e("FCM", "Gagal simpan token: ${e.message}")
+                        Log.e("FCM", "Gagal simpan token: ${e.message}")
                     }
                 }
             }
