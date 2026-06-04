@@ -40,4 +40,6 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE projectId = :projectId")
     suspend fun deleteAllByProject(projectId: String)
+    @Query("SELECT * FROM tasks WHERE id = :taskId AND isDeleted = 0 LIMIT 1")
+    fun getTaskByIdFlow(taskId: String): Flow<TaskEntity?>
 }
