@@ -7,8 +7,9 @@ import com.tasksync.app.domain.model.UserRole
 fun ProjectMemberEntity.toDomain(): ProjectMember = ProjectMember(
     projectId = projectId,
     userId = userId,
-    userName = userName,        // tambahkan
-    userEmail = userEmail,      // tambahkan
+    userName = userName,
+    userEmail = userEmail,
+    userPhotoUrl = userPhotoUrl,    // ← tambahkan ini
     role = UserRole.fromValue(role),
     joinedAt = joinedAt
 )
@@ -17,8 +18,9 @@ fun ProjectMember.toEntity(): ProjectMemberEntity = ProjectMemberEntity(
     projectId = projectId,
     userId = userId,
     role = role.value,
-    userName = userName,        // tambahkan
-    userEmail = userEmail,      // tambahkan
+    userName = userName,
+    userEmail = userEmail,
+    userPhotoUrl = userPhotoUrl,    // ← tambahkan ini
     joinedAt = joinedAt,
     isSynced = false
 )

@@ -1,6 +1,5 @@
 package com.tasksync.app.util
 
-import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
@@ -9,22 +8,14 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.tasksync.app.worker.SyncWorker
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SyncManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val workManager: WorkManager   // ← inject, bukan getInstance()
 ) {
-    /**
-     * Jadwalkan SyncWorker periodik.
-     * userId wajib diisi — tanpa ini worker langsung gagal di baris pertama.
-     * Gunakan ExistingPeriodicWorkPolicy.UPDATE agar jika sudah ada
-     * jadwal sebelumnya (dari login sesi lama), langsung diperbarui
-     * dengan userId yang baru.
-     */
     fun schedule(userId: String) {
         if (userId.isBlank()) return
 
@@ -49,7 +40,7 @@ class SyncManager @Inject constructor(
             )
             .build()
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        workManager.enqueueUniquePeriodicWork(
             SyncWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.UPDATE,
             request
@@ -57,6 +48,6 @@ class SyncManager @Inject constructor(
     }
 
     fun cancelAll() {
-        WorkManager.getInstance(context).cancelUniqueWork(SyncWorker.WORK_NAME)
+        workManager.cancelUniqueWork(SyncWorker.WORK_NAME)
     }
 }

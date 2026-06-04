@@ -68,7 +68,7 @@ class ProjectMemberRepositoryImpl @Inject constructor(
                     val remoteUserIds = memberMaps
                         .mapNotNull { it["userId"] as? String }
                         .toSet()
-                    val localMembers = memberDao.getMemberIdListForProject(projectId)
+                    val localMembers = memberDao.getMemberIdsForProject(projectId)
                     localMembers.forEach { localUserId ->
                         if (localUserId !in remoteUserIds) {
                             memberDao.removeMember(projectId, localUserId)

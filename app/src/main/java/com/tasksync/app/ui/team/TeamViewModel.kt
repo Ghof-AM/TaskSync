@@ -145,6 +145,33 @@ class TeamViewModel @Inject constructor(
             }
         }
     }
+    fun transferOwnership(projectId: String, newOwnerId: String) {
+        viewModelScope.launch {
+            _actionState.value = UiState.Loading
+            try {
+                val currentUser = userRepository.getCurrentUser()
+                    ?: throw Exception("User tidak ditemukan")
+                val newOwnerMember = (membersState.value as? UiState.Success)
+                    ?.data?.find { it.userId == newOwnerId }
+                    ?: throw Exception("Member tidak ditemukan")
+
+                // Buat User object untuk newOwner dari data member yang ada
+                val newOwnerUser = com.tasksync.app.domain.model.User(
+                    id = newOwnerMember.userId,
+                    name = newOwnerMember.userName
+                )
+
+                transferOwnershipUseCase(
+                    projectId = projectId,
+                    currentOwner = currentUser,
+                    newOwner = newOwnerUser
+                )
+                _actionState.value = UiState.Success(Unit)
+            } catch (e: Exception) {
+                _actionState.value = UiState.Error(e.message ?: "Gagal transfer ownership")
+            }
+        }
+    }
 
     fun isOwner(): Boolean = _currentUserRole.value == UserRole.OWNER
     fun isAdminOrOwner(): Boolean =

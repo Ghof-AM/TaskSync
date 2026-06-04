@@ -26,7 +26,7 @@ import com.tasksync.app.data.local.entity.UserEntity
         ActivityLogEntity::class,
         ProjectEntity::class
     ],
-    version = 4,  // naik dari 3 ke 4
+    version = 5,  // naik dari 3 ke 4
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,20 +37,4 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projectMemberDao(): ProjectMemberDao
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun projectDao(): ProjectDao
-    companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
-
-        fun getInstance(context: Context): AppDatabase =
-            INSTANCE ?: synchronized(this) {
-                Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "tasksync.db"
-                )
-                    .fallbackToDestructiveMigration(false)
-                    .build()
-                    .also { INSTANCE = it }
-            }
-    }
 }
