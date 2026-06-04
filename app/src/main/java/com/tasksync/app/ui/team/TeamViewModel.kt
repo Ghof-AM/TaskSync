@@ -81,7 +81,9 @@ class TeamViewModel @Inject constructor(
         viewModelScope.launch {
             _actionState.value = UiState.Loading
             try {
-                inviteMemberUseCase(projectId, email)
+                // Ambil nama user yang sedang login untuk dikirim ke notifikasi
+                val inviterName = userRepository.getCurrentUser()?.name ?: "Seseorang"
+                inviteMemberUseCase(projectId, email, inviterName)
                 _actionState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _actionState.value = UiState.Error(
@@ -137,8 +139,12 @@ class TeamViewModel @Inject constructor(
                     if (member.userName.isBlank()) {
                         val user = userRepository.getUserById(member.userId)
                         if (user != null) {
-                            memberRepository.updateRole(projectId, member.userId, member.role)
-                            // update nama via dao langsung — tambahkan fungsi di repository
+                            memberRepository.refreshMemberName(
+                                projectId,
+                                member.userId,
+                                user.name,
+                                user.email
+                            )
                         }
                     }
                 }

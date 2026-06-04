@@ -34,6 +34,6 @@ fun Map<String, Any?>.toUser(): User = User(
     name = this["name"] as? String ?: "",
     email = this["email"] as? String ?: "",
     photoUrl = this["photoUrl"] as? String ?: "",
-    fcmToken = this["fcmToken"] as? String ?: "",
+    fcmToken = this["fcmToken"] as? String ?: "",  // ← pastikan ini ada
     role = UserRole.fromValue(this["role"] as? String ?: "member")
 )

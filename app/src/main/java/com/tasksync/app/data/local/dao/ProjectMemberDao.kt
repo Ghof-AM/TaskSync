@@ -36,4 +36,18 @@ interface ProjectMemberDao {
 
     @Query("DELETE FROM project_members WHERE projectId = :projectId")
     suspend fun removeAllMembers(projectId: String)
+
+    @Query("SELECT userId FROM project_members WHERE projectId = :projectId")
+    suspend fun getMemberIdsForProject(projectId: String): List<String>
+
+    // TAMBAHAN 2: Mengambil anggota yang isSynced bernilai false (0 dalam SQLite)
+    @Query("SELECT * FROM project_members WHERE isSynced = 0")
+    suspend fun getUnsyncedMembers(): List<ProjectMemberEntity>
+
+    // TAMBAHAN 3: Mengubah status isSynced menjadi true (1 dalam SQLite) setelah sukses upload
+    @Query("UPDATE project_members SET isSynced = 1 WHERE projectId = :projectId AND userId = :userId")
+    suspend fun markAsSynced(projectId: String, userId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMemberLocally(member: ProjectMemberEntity)
 }

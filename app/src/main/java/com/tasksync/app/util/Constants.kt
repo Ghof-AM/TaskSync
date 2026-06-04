@@ -28,4 +28,8 @@ object Constants {
     // Validation
     const val MAX_COMMENT_LENGTH = 500
     const val MIN_PASSWORD_LENGTH = 6
+
+    // Ganti dengan project ID Firebase kamu
+    // Bisa dilihat di Firebase Console → Project Settings → General → Project ID
+    const val FIREBASE_PROJECT_ID = "tasksync-b2d61"  // sesuaikan dengan project ID kamu
 }

@@ -173,7 +173,6 @@ fun ProjectListScreen(
         }
     }
 
-    // Create Project Dialog
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -299,13 +298,7 @@ fun EmptyProjectState(onCreateClick: () -> Unit) {
         Icon(
             imageVector = Icons.Default.FolderOpen,
             contentDescription = null,
-            modifier = Modifier
-                .padding(bottom = 16.dp)
-                .let {
-                    it.then(
-                        Modifier.padding(8.dp)
-                    )
-                },
+            modifier = Modifier.padding(bottom = 16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(

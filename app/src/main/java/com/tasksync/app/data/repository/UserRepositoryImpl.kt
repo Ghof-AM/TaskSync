@@ -87,17 +87,27 @@ class UserRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getUserById(userId: String): User? {
+        // Cek lokal dulu
         val local = userDao.getUserById(userId)
-        if (local != null) return local.toDomain()
+        if (local != null && local.fcmToken.isNotBlank()) return local.toDomain()
+
+        // Jika token kosong atau tidak ada, fetch ulang dari Firestore
         if (networkMonitor.isOnline()) {
-            val remote = firestoreService.getUserById(userId)
-            if (remote != null) {
-                val user = remote.toUser()
-                userDao.insertUser(user.toEntity())
-                return user
+            try {
+                val remote = firestoreService.getUserById(userId)
+                if (remote != null) {
+                    val user = remote.toUser()
+                    userDao.insertUser(user.toEntity()) // simpan dengan fcmToken
+                    android.util.Log.d("UserRepo",
+                        "User fetched from Firestore: ${user.name}, token: ${user.fcmToken}")
+                    return user
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("UserRepo", "Fetch failed: ${e.message}")
             }
         }
-        return null
+
+        return local?.toDomain()
     }
 
     override fun getUsersByIds(userIds: List<String>): Flow<List<User>> =
@@ -114,11 +124,19 @@ class UserRepositoryImpl @Inject constructor(
 
     override suspend fun updateFcmToken(token: String) {
         val uid = firebaseAuth.currentUser?.uid ?: return
+        android.util.Log.d("UserRepo", "Updating FCM token for uid: $uid")
+
+        // Update Room lokal
         userDao.updateFcmToken(uid, token)
+
+        // Sync ke Firestore
         if (networkMonitor.isOnline()) {
             try {
                 firestoreService.updateFcmToken(uid, token)
-            } catch (e: Exception) { /* retry nanti */ }
+                android.util.Log.d("UserRepo", "FCM token synced to Firestore")
+            } catch (e: Exception) {
+                android.util.Log.e("UserRepo", "FCM token sync failed: ${e.message}")
+            }
         }
     }
 

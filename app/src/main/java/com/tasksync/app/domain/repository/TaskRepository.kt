@@ -12,4 +12,14 @@ interface TaskRepository {
     suspend fun deleteTask(taskId: String)
     suspend fun updateStatus(taskId: String, status: String)
     suspend fun syncAllPending()
+
+    /**
+     * Mulai mendengarkan perubahan task dari Firestore secara real-time.
+     * Data yang masuk langsung di-upsert ke Room, sehingga getAllTasks() Flow
+     * yang sudah dipakai UI akan otomatis ter-trigger tanpa perubahan di ViewModel.
+     *
+     * Harus dipanggil saat user membuka halaman task sebuah project.
+     * Listener berhenti otomatis saat scope yang dipakai dibatalkan.
+     */
+    fun startListening(projectId: String)
 }
