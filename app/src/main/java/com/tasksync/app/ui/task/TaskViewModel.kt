@@ -15,12 +15,14 @@ import com.tasksync.app.domain.usecase.task.DeleteTaskUseCase
 import com.tasksync.app.domain.usecase.task.EditTaskUseCase
 import com.tasksync.app.domain.usecase.task.GetAllTasksUseCase
 import com.tasksync.app.domain.usecase.task.UpdateTaskStatusUseCase
+import com.tasksync.app.util.NetworkMonitor
 import com.tasksync.app.util.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -35,6 +37,7 @@ class TaskViewModel @Inject constructor(
     private val editTaskUseCase: EditTaskUseCase,
     private val memberRepository: ProjectMemberRepository,
     private val taskRepository: TaskRepository,
+    private val networkMonitor: NetworkMonitor,
     private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
@@ -59,14 +62,31 @@ class TaskViewModel @Inject constructor(
     private val _editState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val editState: StateFlow<UiState<Unit>> = _editState.asStateFlow()
 
+    // Diexpose ke UI untuk menampilkan banner offline
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
+
     val currentUserId: String
         get() = firebaseAuth.currentUser?.uid ?: ""
 
+    init {
+        // Observer koneksi jaringan.
+        // distinctUntilChanged() penting — tanpa ini setiap emit Flow (meski nilainya sama)
+        // akan trigger syncAllPending() berulang kali tidak perlu.
+        networkMonitor.isOnlineFlow
+            .distinctUntilChanged()
+            .onEach { online ->
+                _isOnline.value = online
+                if (online) {
+                    // Langsung upload semua task yang dibuat/diedit saat offline
+                    // tanpa perlu tunggu SyncWorker 15 menit berikutnya
+                    taskRepository.syncAllPending()
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
     fun loadTasks(projectId: String) {
-        // Mulai listener Firestore real-time untuk project ini.
-        // Listener akan push data baru ke Room setiap ada perubahan dari user manapun.
-        // getAllTasksUseCase mengambil dari Room (Flow), sehingga UI otomatis refresh
-        // tanpa perlu polling atau restart.
         taskRepository.startListening(projectId)
 
         getAllTasksUseCase(projectId)
