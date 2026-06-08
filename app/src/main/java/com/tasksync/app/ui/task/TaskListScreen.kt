@@ -1,8 +1,5 @@
 package com.tasksync.app.ui.task
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,14 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -65,6 +59,7 @@ import com.tasksync.app.domain.model.Priority
 import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.TaskStatus
 import com.tasksync.app.domain.model.UserRole
+import com.tasksync.app.ui.components.NetworkStatusChip
 import com.tasksync.app.util.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -79,7 +74,6 @@ fun TaskListScreen(
     onNavigateToDetail: (taskId: String) -> Unit,
     onNavigateToCreate: () -> Unit,
     onNavigateToTeam: () -> Unit,
-    onNavigateToProfile: () -> Unit,
     onNavigateToActivityLog: () -> Unit,
     viewModel: TaskViewModel = hiltViewModel()
 ) {
@@ -92,13 +86,6 @@ fun TaskListScreen(
 
     val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
 
-    // Tampilkan snackbar saat kembali online agar user tahu data sedang diupload
-    LaunchedEffect(isOnline) {
-        if (isOnline) {
-            snackbarHostState.showSnackbar("✓ Kembali online — menyinkronkan data...")
-        }
-    }
-
     LaunchedEffect(projectId) {
         viewModel.loadTasks(projectId)
         viewModel.loadUserRole(projectId)
@@ -106,220 +93,178 @@ fun TaskListScreen(
 
     LaunchedEffect(createState) {
         if (createState is UiState.Error) {
-            snackbarHostState.showSnackbar(
-                (createState as UiState.Error).message
-            )
+            snackbarHostState.showSnackbar((createState as UiState.Error).message)
             viewModel.resetCreateState()
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        projectName,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToActivityLog) {
-                        Icon(
-                            Icons.Default.History,
-                            contentDescription = "Riwayat Aktivitas",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    IconButton(onClick = onNavigateToTeam) {
-                        Icon(
-                            Icons.Default.Group,
-                            contentDescription = "Tim",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    IconButton(onClick = onNavigateToProfile) {
-                        Icon(
-                            Icons.Default.AccountCircle,
-                            contentDescription = "Profil",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        },
-        floatingActionButton = {
-            if (isAdmin) {
-                FloatingActionButton(
-                    onClick = onNavigateToCreate,
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Buat Task",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Banner offline — muncul/hilang dengan animasi slide
-            AnimatedVisibility(
-                visible = !isOnline,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.errorContainer
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WifiOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = "Tidak ada koneksi — task tersimpan lokal dan akan dikirim saat online",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            projectName,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onNavigateToActivityLog) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = "Riwayat Aktivitas",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        IconButton(onClick = onNavigateToTeam) {
+                            Icon(
+                                Icons.Default.Group,
+                                contentDescription = "Tim",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            },
+            floatingActionButton = {
+                if (isAdmin) {
+                    FloatingActionButton(
+                        onClick = onNavigateToCreate,
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Buat Task",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
-            }
-
-            // Filter chips
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                item {
-                    FilterChip(
-                        selected = selectedFilter == null,
-                        onClick = { viewModel.setFilter(null) },
-                        label = { Text("Semua") }
-                    )
-                }
-                items(TaskStatus.entries) { status ->
-                    FilterChip(
-                        selected = selectedFilter == status,
-                        onClick = { viewModel.setFilter(status) },
-                        label = { Text(status.displayName()) }
-                    )
-                }
-            }
-
-            // Task list
-            when (val state = tasksState) {
-                is UiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedFilter == null,
+                            onClick = { viewModel.setFilter(null) },
+                            label = { Text("Semua") }
+                        )
+                    }
+                    items(TaskStatus.entries) { status ->
+                        FilterChip(
+                            selected = selectedFilter == status,
+                            onClick = { viewModel.setFilter(status) },
+                            label = { Text(status.displayName()) }
+                        )
                     }
                 }
 
-                is UiState.Success -> {
-                    val filtered = if (selectedFilter == null) {
-                        state.data
-                    } else {
-                        state.data.filter { it.status == selectedFilter }
-                    }
-
-                    if (filtered.isEmpty()) {
+                when (val state = tasksState) {
+                    is UiState.Loading -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = if (selectedFilter == null)
-                                        "Belum ada task"
-                                    else "Tidak ada task ${selectedFilter?.displayName()}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (isAdmin) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                        ) { CircularProgressIndicator() }
+                    }
+                    is UiState.Success -> {
+                        val filtered = if (selectedFilter == null) state.data
+                        else state.data.filter { it.status == selectedFilter }
+
+                        if (filtered.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
-                                        text = "Tap + untuk membuat task baru",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = if (selectedFilter == null) "Belum ada task"
+                                        else "Tidak ada task ${selectedFilter?.displayName()}",
+                                        style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (isAdmin) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Tap + untuk membuat task baru",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 16.dp,
+                                    // Beri ruang di bawah agar item terakhir tidak
+                                    // tertutup chip offline saat offline
+                                    bottom = 72.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(items = filtered, key = { it.id }) { task ->
+                                    TaskCard(
+                                        task = task,
+                                        isAdmin = isAdmin,
+                                        onClick = { onNavigateToDetail(task.id) },
+                                        onStatusToggle = {
+                                            val newStatus = when (task.status) {
+                                                TaskStatus.TODO -> TaskStatus.IN_PROGRESS
+                                                TaskStatus.IN_PROGRESS -> TaskStatus.DONE
+                                                TaskStatus.DONE -> TaskStatus.TODO
+                                            }
+                                            viewModel.updateStatus(task.id, newStatus)
+                                        },
+                                        onDelete = { viewModel.deleteTask(task.id) }
                                     )
                                 }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                    }
+                    is UiState.Error -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            items(
-                                items = filtered,
-                                key = { it.id }
-                            ) { task ->
-                                TaskCard(
-                                    task = task,
-                                    isAdmin = isAdmin,
-                                    onClick = { onNavigateToDetail(task.id) },
-                                    onStatusToggle = {
-                                        val newStatus = when (task.status) {
-                                            TaskStatus.TODO -> TaskStatus.IN_PROGRESS
-                                            TaskStatus.IN_PROGRESS -> TaskStatus.DONE
-                                            TaskStatus.DONE -> TaskStatus.TODO
-                                        }
-                                        viewModel.updateStatus(task.id, newStatus)
-                                    },
-                                    onDelete = { viewModel.deleteTask(task.id) }
-                                )
-                            }
+                            Text(text = state.message, color = MaterialTheme.colorScheme.error)
                         }
                     }
+                    else -> {}
                 }
-
-                is UiState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = state.message,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                else -> {}
             }
         }
+
+        // NetworkStatusChip float di BottomStart.
+        // Chip ini menangani logika tampil/hilang sendiri termasuk
+        // animasi dan chip "Online" 3 detik setelah recover.
+        // LaunchedEffect(isOnline) untuk snackbar sudah dihapus —
+        // tidak perlu dua indikator untuk hal yang sama.
+        NetworkStatusChip(
+            isOnline = isOnline,
+            modifier = Modifier.align(Alignment.BottomStart)
+        )
     }
 }
 
@@ -336,9 +281,7 @@ fun TaskCard(
             .fillMaxWidth()
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
@@ -346,14 +289,10 @@ fun TaskCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onStatusToggle,
-                modifier = Modifier.size(36.dp)
-            ) {
+            IconButton(onClick = onStatusToggle, modifier = Modifier.size(36.dp)) {
                 Icon(
                     imageVector = if (task.status == TaskStatus.DONE)
-                        Icons.Default.CheckCircle
-                    else Icons.Default.RadioButtonUnchecked,
+                        Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                     contentDescription = "Toggle status",
                     tint = when (task.status) {
                         TaskStatus.DONE -> Color(0xFF4CAF50)
@@ -362,9 +301,7 @@ fun TaskCard(
                     }
                 )
             }
-
             Spacer(modifier = Modifier.width(8.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -397,9 +334,7 @@ fun TaskCard(
                         )
                     }
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.bodyLarge,
@@ -409,7 +344,6 @@ fun TaskCard(
                     textDecoration = if (task.status == TaskStatus.DONE)
                         TextDecoration.LineThrough else TextDecoration.None
                 )
-
                 if (task.description.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -420,7 +354,6 @@ fun TaskCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
                 if (task.assignedToName.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -429,7 +362,6 @@ fun TaskCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-
                 if (task.deadline > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
                     val isOverdue = task.deadline < System.currentTimeMillis()
@@ -445,12 +377,8 @@ fun TaskCard(
                     )
                 }
             }
-
             if (isAdmin) {
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(36.dp)
-                ) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Hapus task",

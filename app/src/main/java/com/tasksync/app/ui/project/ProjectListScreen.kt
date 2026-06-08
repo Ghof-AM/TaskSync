@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FolderOpen
@@ -59,6 +60,7 @@ import java.util.Locale
 @Composable
 fun ProjectListScreen(
     onNavigateToTaskList: (projectId: String) -> Unit,
+    onNavigateToProfile: () -> Unit,   // ← parameter baru
     onLogout: () -> Unit,
     viewModel: ProjectViewModel = hiltViewModel()
 ) {
@@ -80,9 +82,7 @@ fun ProjectListScreen(
                 snackbarHostState.showSnackbar("Project berhasil dibuat!")
             }
             is UiState.Error -> {
-                snackbarHostState.showSnackbar(
-                    (createState as UiState.Error).message
-                )
+                snackbarHostState.showSnackbar((createState as UiState.Error).message)
                 viewModel.resetCreateState()
             }
             else -> {}
@@ -92,17 +92,21 @@ fun ProjectListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "TaskSync",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("TaskSync", fontWeight = FontWeight.Bold) },
                 actions = {
+                    // Fix 3: ikon profil dipindah ke halaman utama
+                    IconButton(onClick = onNavigateToProfile) {
+                        Icon(
+                            Icons.Default.AccountCircle,
+                            contentDescription = "Profil",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                     IconButton(onClick = onLogout) {
                         Icon(
                             Icons.Default.ExitToApp,
-                            contentDescription = "Logout"
+                            contentDescription = "Logout",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 },
@@ -118,54 +122,33 @@ fun ProjectListScreen(
                 onClick = { showCreateDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Buat Project",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                Icon(Icons.Default.Add, contentDescription = "Buat Project", tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when (val state = projectsState) {
                 is UiState.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
                 is UiState.Success -> {
                     if (state.data.isEmpty()) {
-                        EmptyProjectState(
-                            onCreateClick = { showCreateDialog = true }
-                        )
+                        EmptyProjectState(onCreateClick = { showCreateDialog = true })
                     } else {
                         LazyColumn(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(state.data) { project ->
-                                ProjectCard(
-                                    project = project,
-                                    onClick = { onNavigateToTaskList(project.id) }
-                                )
+                                ProjectCard(project = project, onClick = { onNavigateToTaskList(project.id) })
                             }
                         }
                     }
                 }
                 is UiState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = state.message,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                    Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = state.message, color = MaterialTheme.colorScheme.error)
                     }
                 }
                 else -> {}
@@ -175,11 +158,7 @@ fun ProjectListScreen(
 
     if (showCreateDialog) {
         AlertDialog(
-            onDismissRequest = {
-                showCreateDialog = false
-                projectName = ""
-                projectDescription = ""
-            },
+            onDismissRequest = { showCreateDialog = false; projectName = ""; projectDescription = "" },
             title = { Text("Buat Project Baru") },
             text = {
                 Column {
@@ -202,27 +181,15 @@ fun ProjectListScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        viewModel.createProject(projectName, projectDescription)
-                    },
-                    enabled = projectName.isNotBlank() &&
-                            createState !is UiState.Loading
+                    onClick = { viewModel.createProject(projectName, projectDescription) },
+                    enabled = projectName.isNotBlank() && createState !is UiState.Loading
                 ) {
-                    if (createState is UiState.Loading) {
-                        CircularProgressIndicator(strokeWidth = 2.dp)
-                    } else {
-                        Text("Buat")
-                    }
+                    if (createState is UiState.Loading) CircularProgressIndicator(strokeWidth = 2.dp)
+                    else Text("Buat")
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        showCreateDialog = false
-                        projectName = ""
-                        projectDescription = ""
-                    }
-                ) {
+                TextButton(onClick = { showCreateDialog = false; projectName = ""; projectDescription = "" }) {
                     Text("Batal")
                 }
             }
@@ -231,55 +198,26 @@ fun ProjectListScreen(
 }
 
 @Composable
-fun ProjectCard(
-    project: Project,
-    onClick: () -> Unit
-) {
+fun ProjectCard(project: Project, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.FolderOpen,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 12.dp)
-            )
+            Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = project.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(text = project.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (project.description.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = project.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(text = project.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Dibuat ${
-                        SimpleDateFormat("dd MMM yyyy", Locale("id"))
-                            .format(Date(project.createdAt))
-                    }",
+                    text = "Dibuat ${SimpleDateFormat("dd MMM yyyy", Locale("id")).format(Date(project.createdAt))}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -290,28 +228,11 @@ fun ProjectCard(
 
 @Composable
 fun EmptyProjectState(onCreateClick: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.FolderOpen,
-            contentDescription = null,
-            modifier = Modifier.padding(bottom = 16.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "Belum ada project",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.padding(bottom = 16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = "Belum ada project", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Buat project pertamamu sekarang",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(text = "Buat project pertamamu sekarang", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onCreateClick) {
             Icon(Icons.Default.Add, contentDescription = null)

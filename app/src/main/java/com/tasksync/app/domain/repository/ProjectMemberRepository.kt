@@ -14,4 +14,6 @@ interface ProjectMemberRepository {
     suspend fun refreshMemberName(projectId: String, userId: String, name: String, email: String)
     suspend fun getMemberIdsForProject(projectId: String): List<String>
     suspend fun syncAllPending()
+    fun startListening(projectId: String)
+    fun stopListening(projectId: String)
 }
