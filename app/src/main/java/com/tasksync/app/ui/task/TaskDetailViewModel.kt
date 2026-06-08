@@ -40,11 +40,9 @@ class TaskDetailViewModel @Inject constructor(
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     init {
-        // Observe koneksi jaringan — tampilkan banner offline di UI
         networkMonitor.isOnlineFlow
             .onEach { online ->
                 _isOnline.value = online
-                // Instant sync saat kembali online — tidak perlu tunggu SyncWorker 15 menit
                 if (online) {
                     taskRepository.syncAllPending()
                 }
@@ -53,8 +51,6 @@ class TaskDetailViewModel @Inject constructor(
     }
 
     fun loadTask(taskId: String) {
-        // Gunakan Flow dari Room agar UI otomatis update saat data berubah
-        // (baik dari listener Firestore maupun dari updateStatus lokal)
         taskRepository.getTaskFlow(taskId)
             .onEach { task ->
                 if (task != null) {
@@ -81,9 +77,19 @@ class TaskDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 updateTaskStatusUseCase(taskId, status)
-                // Tidak perlu loadTask() lagi — Flow di atas akan emit otomatis
             } catch (e: Exception) {
                 _taskState.value = UiState.Error(e.message ?: "Gagal update status")
+            }
+        }
+    }
+
+    fun deleteTask(taskId: String, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteTask(taskId)
+                onDeleted()
+            } catch (e: Exception) {
+                _taskState.value = UiState.Error(e.message ?: "Gagal menghapus task")
             }
         }
     }

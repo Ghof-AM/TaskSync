@@ -43,20 +43,28 @@ class CommentViewModel @Inject constructor(
     val currentUserId: String
         get() = firebaseAuth.currentUser?.uid ?: ""
 
+    // Guard: simpan taskId yang sedang aktif agar loadComments tidak re-subscribe
+    // jika dipanggil ulang dengan taskId yang sama (misal karena recomposition)
+    private var activeTaskId: String = ""
+
     fun loadComments(taskId: String) {
-        // Observe Room (realtime lokal)
+        // Jika sudah subscribe taskId yang sama dan sudah ada data, skip
+        // Ini mencegah komentar flash ke Loading saat status task berubah
+        if (activeTaskId == taskId && _commentsState.value is UiState.Success) return
+
+        activeTaskId = taskId
+
         getCommentsUseCase(taskId)
             .onEach { comments ->
                 _commentsState.value = UiState.Success(comments)
             }
             .catch { e ->
-                _commentsState.value = UiState.Error(
-                    e.message ?: "Gagal memuat komentar"
-                )
+                _commentsState.value = UiState.Error(e.message ?: "Gagal memuat komentar")
             }
             .launchIn(viewModelScope)
 
-        // Pull dari Firestore sekali saat pertama buka
+        // Pull dari Firestore hanya sekali saat pertama buka task ini
+        // Tidak mereset state — data Room tetap tampil selama pull berlangsung
         viewModelScope.launch {
             try {
                 commentRepository.pullFromFirestore(taskId)
@@ -66,18 +74,10 @@ class CommentViewModel @Inject constructor(
         }
     }
 
-    private suspend fun pullCommentsFromFirestore(taskId: String) {
-        // Inject FirestoreService dan CommentDao langsung di ViewModel
-        // Tapi karena kita pakai repository pattern, kita bisa tambahkan
-        // fungsi pull di repository
-    }
-
     fun loadCurrentUser() {
         viewModelScope.launch {
             try {
-                val user = userRepository.getCurrentUser()
-                _currentUser.value = user
-                android.util.Log.d("CommentVM", "Current user loaded: ${user?.name}")
+                _currentUser.value = userRepository.getCurrentUser()
             } catch (e: Exception) {
                 android.util.Log.e("CommentVM", "Load user failed: ${e.message}")
             }
@@ -92,9 +92,7 @@ class CommentViewModel @Inject constructor(
                 addCommentUseCase(taskId, content, user)
                 _addCommentState.value = UiState.Success(Unit)
             } catch (e: Exception) {
-                _addCommentState.value = UiState.Error(
-                    e.message ?: "Gagal menambahkan komentar"
-                )
+                _addCommentState.value = UiState.Error(e.message ?: "Gagal menambahkan komentar")
             }
         }
     }
@@ -104,9 +102,7 @@ class CommentViewModel @Inject constructor(
             try {
                 deleteCommentUseCase(commentId)
             } catch (e: Exception) {
-                _commentsState.value = UiState.Error(
-                    e.message ?: "Gagal menghapus komentar"
-                )
+                _commentsState.value = UiState.Error(e.message ?: "Gagal menghapus komentar")
             }
         }
     }

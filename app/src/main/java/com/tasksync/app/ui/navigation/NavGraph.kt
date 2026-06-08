@@ -10,14 +10,14 @@ import androidx.navigation.navArgument
 import com.tasksync.app.ui.auth.AuthViewModel
 import com.tasksync.app.ui.auth.LoginScreen
 import com.tasksync.app.ui.auth.RegisterScreen
+import com.tasksync.app.ui.log.ActivityLogScreen
+import com.tasksync.app.ui.profile.ProfileScreen
 import com.tasksync.app.ui.project.ProjectListScreen
 import com.tasksync.app.ui.task.CreateTaskScreen
-import com.tasksync.app.ui.task.TaskListScreen
-import com.tasksync.app.ui.task.TaskDetailScreen
-import com.tasksync.app.ui.profile.ProfileScreen
-import com.tasksync.app.ui.team.TeamScreen
 import com.tasksync.app.ui.task.EditTaskScreen
-import com.tasksync.app.ui.log.ActivityLogScreen
+import com.tasksync.app.ui.task.TaskDetailScreen
+import com.tasksync.app.ui.task.TaskListScreen
+import com.tasksync.app.ui.team.TeamScreen
 
 @Composable
 fun NavGraph(
@@ -60,6 +60,9 @@ fun NavGraph(
                 onNavigateToTaskList = { projectId ->
                     navController.navigate(Screen.TaskList.createRoute(projectId))
                 },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.Profile.route)
+                },
                 onLogout = {
                     authViewModel.logout()
                     navController.navigate(Screen.Login.route) {
@@ -88,9 +91,6 @@ fun NavGraph(
                 onNavigateToTeam = {
                     navController.navigate(Screen.Team.createRoute(projectId))
                 },
-                onNavigateToProfile = {
-                    navController.navigate(Screen.Profile.route)
-                },
                 onNavigateToActivityLog = {
                     navController.navigate(Screen.ActivityLog.createRoute(projectId))
                 }
@@ -111,7 +111,6 @@ fun NavGraph(
             )
         }
 
-        // Profile
         composable(Screen.Profile.route) {
             ProfileScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -123,7 +122,6 @@ fun NavGraph(
             )
         }
 
-        // Team
         composable(
             route = Screen.Team.route,
             arguments = listOf(
@@ -137,7 +135,6 @@ fun NavGraph(
             )
         }
 
-        // Placeholder untuk TaskDetail
         composable(
             route = Screen.TaskDetail.route,
             arguments = listOf(
@@ -153,6 +150,7 @@ fun NavGraph(
                 }
             )
         }
+
         composable(
             route = Screen.EditTask.route,
             arguments = listOf(
@@ -169,7 +167,7 @@ fun NavGraph(
                 onTaskUpdated = { navController.popBackStack() }
             )
         }
-        // Activity Log
+
         composable(
             route = Screen.ActivityLog.route,
             arguments = listOf(

@@ -1,8 +1,5 @@
 package com.tasksync.app.ui.task
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +22,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +39,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -59,6 +59,7 @@ import com.tasksync.app.domain.model.Task
 import com.tasksync.app.domain.model.TaskStatus
 import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.ui.comment.CommentViewModel
+import com.tasksync.app.ui.components.NetworkStatusChip
 import com.tasksync.app.util.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -81,20 +82,21 @@ fun TaskDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var commentText by remember { mutableStateOf("") }
     val currentUser by commentViewModel.currentUser.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val isAdmin = userRole == UserRole.OWNER || userRole == UserRole.SECOND_OWNER
 
-    LaunchedEffect(isOnline) {
-        if (isOnline) {
-            snackbarHostState.showSnackbar("✓ Kembali online — menyinkronkan data...")
-        }
-    }
-
     LaunchedEffect(taskId) {
         taskDetailViewModel.loadTask(taskId)
+    }
+
+    LaunchedEffect(Unit) {
         commentViewModel.loadComments(taskId)
         commentViewModel.loadCurrentUser()
     }
+
+    // LaunchedEffect(isOnline) untuk snackbar dihapus —
+    // NetworkStatusChip sudah menangani feedback online/offline sendiri.
 
     LaunchedEffect(addCommentState) {
         when (addCommentState) {
@@ -103,106 +105,105 @@ fun TaskDetailScreen(
                 commentViewModel.resetAddCommentState()
             }
             is UiState.Error -> {
-                snackbarHostState.showSnackbar(
-                    (addCommentState as UiState.Error).message
-                )
+                snackbarHostState.showSnackbar((addCommentState as UiState.Error).message)
                 commentViewModel.resetAddCommentState()
             }
             else -> {}
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Detail Task", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali"
-                        )
-                    }
-                },
-                actions = {
-                    if (isAdmin) {
-                        IconButton(onClick = {
-                            val task = (taskState as? UiState.Success)?.data
-                            if (task != null) onNavigateToEdit(taskId, task.projectId)
-                        }) {
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Hapus Task") },
+            text = {
+                Text("Task ini akan dihapus permanen beserta semua komentarnya. Lanjutkan?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        taskDetailViewModel.deleteTask(taskId) { onNavigateBack() }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Hapus") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Batal") }
+            }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Detail Task", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
                             Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Edit Task",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Kembali"
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    },
+                    actions = {
+                        if (isAdmin) {
+                            IconButton(onClick = {
+                                val task = (taskState as? UiState.Success)?.data
+                                if (task != null) onNavigateToEdit(taskId, task.projectId)
+                            }) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit Task",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Hapus Task",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Banner offline dengan animasi
-            AnimatedVisibility(
-                visible = !isOnline,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.errorContainer
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WifiOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Tidak ada koneksi — komentar tersimpan lokal",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { paddingValues ->
             when (val state = taskState) {
                 is UiState.Loading -> {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
                         contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    ) { CircularProgressIndicator() }
                 }
-
                 is UiState.Success -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .padding(paddingValues)
                             .imePadding()
                     ) {
                         LazyColumn(
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(16.dp),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 16.dp,
+                                // Ruang bawah agar item terakhir tidak tertutup chip
+                                bottom = 72.dp
+                            ),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             item {
@@ -214,7 +215,6 @@ fun TaskDetailScreen(
                                     }
                                 )
                             }
-
                             item {
                                 HorizontalDivider()
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -224,7 +224,6 @@ fun TaskDetailScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-
                             when (val commentState = commentsState) {
                                 is UiState.Success -> {
                                     if (commentState.data.isEmpty()) {
@@ -274,7 +273,6 @@ fun TaskDetailScreen(
                                 else -> {}
                             }
                         }
-
                         HorizontalDivider()
                         CommentInputBar(
                             value = commentText,
@@ -289,22 +287,27 @@ fun TaskDetailScreen(
                         )
                     }
                 }
-
                 is UiState.Error -> {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = state.message,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Text(text = state.message, color = MaterialTheme.colorScheme.error)
                     }
                 }
-
                 else -> {}
             }
         }
+
+        // NetworkStatusChip float di BottomStart.
+        // Menangani tampil/hilang sendiri dengan animasi.
+        // Chip "Online" muncul 3 detik saat recover lalu hilang otomatis.
+        NetworkStatusChip(
+            isOnline = isOnline,
+            modifier = Modifier.align(Alignment.BottomStart)
+        )
     }
 }
 
@@ -331,7 +334,6 @@ fun TaskInfoSection(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(
                     shape = MaterialTheme.shapes.small,
@@ -358,7 +360,6 @@ fun TaskInfoSection(
                     )
                 }
             }
-
             if (task.description.isNotBlank()) {
                 Text(
                     text = task.description,
@@ -366,7 +367,6 @@ fun TaskInfoSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             if (task.assignedToName.isNotBlank()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -385,7 +385,6 @@ fun TaskInfoSection(
                     )
                 }
             }
-
             if (task.deadline > 0) {
                 val isOverdue = task.deadline < System.currentTimeMillis()
                         && task.status != TaskStatus.DONE
@@ -399,7 +398,6 @@ fun TaskInfoSection(
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Text(
                 text = "Ubah Status:",
@@ -438,10 +436,7 @@ fun CommentItem(
     isOwner: Boolean,
     onDelete: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Surface(
             modifier = Modifier
                 .size(36.dp)
@@ -457,9 +452,7 @@ fun CommentItem(
                 )
             }
         }
-
         Spacer(modifier = Modifier.width(10.dp))
-
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -479,10 +472,7 @@ fun CommentItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (isOwner) {
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(24.dp)
-                        ) {
+                        IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Hapus komentar",
@@ -521,10 +511,7 @@ fun CommentInputBar(
             value = value,
             onValueChange = onValueChange,
             placeholder = {
-                Text(
-                    if (isEnabled) "Tulis komentar..."
-                    else "Memuat profil..."
-                )
+                Text(if (isEnabled) "Tulis komentar..." else "Memuat profil...")
             },
             enabled = isEnabled,
             maxLines = 3,

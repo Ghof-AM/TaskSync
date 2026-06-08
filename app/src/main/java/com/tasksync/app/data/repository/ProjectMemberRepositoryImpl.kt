@@ -22,6 +22,7 @@ class ProjectMemberRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val firestoreService: FirestoreService,
     private val networkMonitor: NetworkMonitor
+
 ) : ProjectMemberRepository {
 
     private val listenerJobs = mutableMapOf<String, Job>()
@@ -45,7 +46,7 @@ class ProjectMemberRepositoryImpl @Inject constructor(
      * Dipanggil dari TeamViewModel saat halaman team dibuka.
      * Satu project hanya punya satu listener aktif — listener lama dibatalkan dulu.
      */
-    fun startListening(projectId: String) {
+    override fun startListening(projectId: String) {
         listenerJobs[projectId]?.cancel()
         listenerJobs[projectId] = CoroutineScope(Dispatchers.IO).launch {
             firestoreService.listenToMembersByProject(projectId)
@@ -149,7 +150,7 @@ class ProjectMemberRepositoryImpl @Inject constructor(
         }
     }
 
-    fun stopListening(projectId: String) {
+    override fun stopListening(projectId: String) {
         listenerJobs[projectId]?.cancel()
         listenerJobs.remove(projectId)
     }

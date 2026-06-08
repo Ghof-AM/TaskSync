@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.tasksync.app.data.repository.ProjectMemberRepositoryImpl
 import com.tasksync.app.domain.model.ProjectMember
+import com.tasksync.app.domain.model.User
 import com.tasksync.app.domain.model.UserRole
 import com.tasksync.app.domain.repository.ProjectMemberRepository
 import com.tasksync.app.domain.repository.UserRepository
@@ -45,18 +46,17 @@ class TeamViewModel @Inject constructor(
     private val _currentUserRole = MutableStateFlow(UserRole.MEMBER)
     val currentUserRole: StateFlow<UserRole> = _currentUserRole.asStateFlow()
 
+    private var currentProjectId: String? = null
+
     val currentUserId: String
         get() = firebaseAuth.currentUser?.uid ?: ""
 
     fun loadMembers(projectId: String) {
-        // Mulai listener real-time agar perubahan role/remove dari user lain
-        // langsung reflect di halaman ini tanpa perlu refresh manual
-        (memberRepository as? ProjectMemberRepositoryImpl)?.startListening(projectId)
-
+        currentProjectId = projectId
+        memberRepository.startListening(projectId)
         memberRepository.getMembersByProject(projectId)
             .onEach { members ->
                 _membersState.value = UiState.Success(members)
-                // Refresh nama untuk member yang belum punya nama
                 members.filter { it.userName.isBlank() }.forEach { member ->
                     viewModelScope.launch {
                         val user = userRepository.getUserById(member.userId)
@@ -72,6 +72,10 @@ class TeamViewModel @Inject constructor(
                 _membersState.value = UiState.Error(e.message ?: "Gagal memuat anggota")
             }
             .launchIn(viewModelScope)
+
+        // Listener Firestore hanya sebagai pelengkap real-time sync
+        // Jika offline, listener tidak berjalan tapi data Room tetap tampil
+        memberRepository.startListening(projectId)
 
         viewModelScope.launch {
             val uid = firebaseAuth.currentUser?.uid ?: return@launch
@@ -97,12 +101,7 @@ class TeamViewModel @Inject constructor(
             _actionState.value = UiState.Loading
             try {
                 val actor = userRepository.getCurrentUser()
-                promoteMemberUseCase(
-                    projectId = projectId,
-                    userId = userId,
-                    actorId = actor?.id ?: "",
-                    actorName = actor?.name ?: ""
-                )
+                promoteMemberUseCase(projectId = projectId, userId = userId, actorId = actor?.id ?: "", actorName = actor?.name ?: "")
                 _actionState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _actionState.value = UiState.Error(e.message ?: "Gagal promote")
@@ -115,12 +114,7 @@ class TeamViewModel @Inject constructor(
             _actionState.value = UiState.Loading
             try {
                 val actor = userRepository.getCurrentUser()
-                demoteMemberUseCase(
-                    projectId = projectId,
-                    userId = userId,
-                    actorId = actor?.id ?: "",
-                    actorName = actor?.name ?: ""
-                )
+                demoteMemberUseCase(projectId = projectId, userId = userId, actorId = actor?.id ?: "", actorName = actor?.name ?: "")
                 _actionState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _actionState.value = UiState.Error(e.message ?: "Gagal demote")
@@ -133,18 +127,14 @@ class TeamViewModel @Inject constructor(
             _actionState.value = UiState.Loading
             try {
                 val actor = userRepository.getCurrentUser()
-                removeMemberUseCase(
-                    projectId = projectId,
-                    userId = userId,
-                    actorId = actor?.id ?: "",
-                    actorName = actor?.name ?: ""
-                )
+                removeMemberUseCase(projectId = projectId, userId = userId, actorId = actor?.id ?: "", actorName = actor?.name ?: "")
                 _actionState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _actionState.value = UiState.Error(e.message ?: "Gagal hapus anggota")
             }
         }
     }
+
     fun transferOwnership(projectId: String, newOwnerId: String) {
         viewModelScope.launch {
             _actionState.value = UiState.Loading
@@ -154,18 +144,8 @@ class TeamViewModel @Inject constructor(
                 val newOwnerMember = (membersState.value as? UiState.Success)
                     ?.data?.find { it.userId == newOwnerId }
                     ?: throw Exception("Member tidak ditemukan")
-
-                // Buat User object untuk newOwner dari data member yang ada
-                val newOwnerUser = com.tasksync.app.domain.model.User(
-                    id = newOwnerMember.userId,
-                    name = newOwnerMember.userName
-                )
-
-                transferOwnershipUseCase(
-                    projectId = projectId,
-                    currentOwner = currentUser,
-                    newOwner = newOwnerUser
-                )
+                val newOwnerUser = User(id = newOwnerMember.userId, name = newOwnerMember.userName)
+                transferOwnershipUseCase(projectId = projectId, currentOwner = currentUser, newOwner = newOwnerUser)
                 _actionState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _actionState.value = UiState.Error(e.message ?: "Gagal transfer ownership")
@@ -175,8 +155,12 @@ class TeamViewModel @Inject constructor(
 
     fun isOwner(): Boolean = _currentUserRole.value == UserRole.OWNER
     fun isAdminOrOwner(): Boolean =
-        _currentUserRole.value == UserRole.OWNER ||
-                _currentUserRole.value == UserRole.SECOND_OWNER
+        _currentUserRole.value == UserRole.OWNER || _currentUserRole.value == UserRole.SECOND_OWNER
+
+    override fun onCleared() {
+        super.onCleared()
+        currentProjectId?.let { memberRepository.stopListening(it) }
+    }
 
     fun resetActionState() {
         _actionState.value = UiState.Idle
