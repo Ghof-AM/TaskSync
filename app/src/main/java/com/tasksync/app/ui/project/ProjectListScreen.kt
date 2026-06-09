@@ -103,7 +103,7 @@ fun ProjectListScreen(
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
-                    IconButton(onClick = onLogout) {
+                    IconButton(onClick = { showLogoutDialog = true }) {
                         Icon(
                             Icons.Default.ExitToApp,
                             contentDescription = "Logout",
