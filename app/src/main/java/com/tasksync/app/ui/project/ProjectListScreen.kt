@@ -69,6 +69,7 @@ fun ProjectListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     var projectName by remember { mutableStateOf("") }
     var projectDescription by remember { mutableStateOf("") }
 
