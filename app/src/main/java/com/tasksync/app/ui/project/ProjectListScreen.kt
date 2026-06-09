@@ -105,7 +105,7 @@ fun ProjectListScreen(
                     }
                     IconButton(onClick = { showLogoutDialog = true }) {
                         Icon(
-                            Icons.Default.ExitToApp,
+                            Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Logout",
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
